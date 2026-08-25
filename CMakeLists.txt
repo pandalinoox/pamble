@@ -20,7 +20,7 @@ add_compile_options(
 
 add_executable(pamble
     src/main.c
-    src/sha256.c
+    src/pamble_sha256.c
 )
 
 target_include_directories(pamble
@@ -34,8 +34,8 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(CRITERION REQUIRED criterion)
 
 add_executable(pamble_tests
-    tests/test_sha256.c
-    src/sha256.c
+    tests/test_pamble_sha256.c
+    src/pamble_sha256.c
 )
 
 target_include_directories(pamble_tests
