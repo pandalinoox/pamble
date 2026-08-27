@@ -1,4 +1,5 @@
-#include <pamble/pamble_sha256.h>
+#include "pamble/pamble_sha256.h"
+#include "pamble/pamble_utility.h"
 #include <string.h>
 
 /*
@@ -41,13 +42,6 @@
 #define COMPRESSION_SIGMA0_ROT1 2
 #define COMPRESSION_SIGMA0_ROT2 13
 #define COMPRESSION_SIGMA0_ROT3 22
-
-#define RETURN_IF_ERROR(status)                                                \
-  do {                                                                         \
-    if ((status) != PAMBLE_SHA256_OK) {                                        \
-      return (status);                                                         \
-    }                                                                          \
-  } while (0)
 
 enum { WV_A = 0, WV_B, WV_C, WV_D, WV_E, WV_F, WV_G, WV_H };
 
@@ -112,7 +106,7 @@ pamble_sha256_status pamble_sha256_init(pamble_sha256_ctx *ctx) {
 
   pamble_sha256_status status = initialize_h_values(ctx->hash_state);
 
-  RETURN_IF_ERROR(status);
+  PAMBLE_RETURN_IF_ERROR(status);
 
   ctx->buffer_length = 0;
   ctx->message_length = 0;
@@ -179,7 +173,7 @@ initialize_initial_words(uint32_t words_state[WORDS_STATE_SIZE],
     pamble_sha256_status status = bytes_to_word(
         &padded_message_block[i * BYTES_PER_WORD], &words_state[i]);
 
-    RETURN_IF_ERROR(status);
+    PAMBLE_RETURN_IF_ERROR(status);
   }
 
   return PAMBLE_SHA256_OK;
@@ -277,10 +271,10 @@ initialize_words_state(uint32_t words_state[WORDS_STATE_SIZE],
   pamble_sha256_status status;
 
   status = initialize_initial_words(words_state, padded_message_block);
-  RETURN_IF_ERROR(status);
+  PAMBLE_RETURN_IF_ERROR(status);
 
   status = expand_words_state(words_state);
-  RETURN_IF_ERROR(status);
+  PAMBLE_RETURN_IF_ERROR(status);
 
   return PAMBLE_SHA256_OK;
 }
@@ -446,17 +440,17 @@ process_message_block(const uint8_t block[BYTES_PER_BLOCK],
   pamble_sha256_status status;
 
   status = initialize_words_state(words_state, block);
-  RETURN_IF_ERROR(status);
+  PAMBLE_RETURN_IF_ERROR(status);
 
   status =
       initialize_working_variable_values(working_variables_state, hash_state);
-  RETURN_IF_ERROR(status);
+  PAMBLE_RETURN_IF_ERROR(status);
 
   status = words_state_compression(words_state, working_variables_state);
-  RETURN_IF_ERROR(status);
+  PAMBLE_RETURN_IF_ERROR(status);
 
   status = update_hash_state(hash_state, working_variables_state);
-  RETURN_IF_ERROR(status);
+  PAMBLE_RETURN_IF_ERROR(status);
 
   return PAMBLE_SHA256_OK;
 }
@@ -509,7 +503,7 @@ pamble_sha256_status pamble_sha256_update(pamble_sha256_ctx *ctx,
       pamble_sha256_status status =
           process_message_block(ctx->buffer, ctx->hash_state);
 
-      RETURN_IF_ERROR(status);
+      PAMBLE_RETURN_IF_ERROR(status);
 
       ctx->buffer_length = 0;
     }
@@ -519,7 +513,7 @@ pamble_sha256_status pamble_sha256_update(pamble_sha256_ctx *ctx,
     pamble_sha256_status status =
         process_message_block(message + message_offset, ctx->hash_state);
 
-    RETURN_IF_ERROR(status);
+    PAMBLE_RETURN_IF_ERROR(status);
 
     message_offset += BYTES_PER_BLOCK;
   }
@@ -616,7 +610,7 @@ export_digest(const uint32_t hash_state[H_VALUES_SIZE],
     pamble_sha256_status status =
         word_to_byte(&hash_state[i], &output_buffer[i * BYTES_PER_WORD]);
 
-    RETURN_IF_ERROR(status);
+    PAMBLE_RETURN_IF_ERROR(status);
   }
 
   return PAMBLE_SHA256_OK;
@@ -666,7 +660,7 @@ pamble_sha256_final(const pamble_sha256_ctx *ctx,
     pamble_sha256_status status =
         process_message_block(final_ctx.buffer, final_ctx.hash_state);
 
-    RETURN_IF_ERROR(status);
+    PAMBLE_RETURN_IF_ERROR(status);
 
     final_ctx.buffer_length = 0;
   }
@@ -677,13 +671,13 @@ pamble_sha256_final(const pamble_sha256_ctx *ctx,
   pamble_sha256_status status = encode_length(
       bit_length, &final_ctx.buffer[BYTES_PER_BLOCK - BYTES_PER_LENGTH_FIELD]);
 
-  RETURN_IF_ERROR(status);
+  PAMBLE_RETURN_IF_ERROR(status);
 
   status = process_message_block(final_ctx.buffer, final_ctx.hash_state);
-  RETURN_IF_ERROR(status);
+  PAMBLE_RETURN_IF_ERROR(status);
 
   status = export_digest(final_ctx.hash_state, output_buffer);
-  RETURN_IF_ERROR(status);
+  PAMBLE_RETURN_IF_ERROR(status);
 
   return PAMBLE_SHA256_OK;
 }
@@ -719,13 +713,13 @@ pamble_sha256(const uint8_t *message, size_t message_length,
   pamble_sha256_ctx ctx;
 
   pamble_sha256_status status = pamble_sha256_init(&ctx);
-  RETURN_IF_ERROR(status);
+  PAMBLE_RETURN_IF_ERROR(status);
 
   status = pamble_sha256_update(&ctx, message, message_length);
-  RETURN_IF_ERROR(status);
+  PAMBLE_RETURN_IF_ERROR(status);
 
   status = pamble_sha256_final(&ctx, output_buffer);
-  RETURN_IF_ERROR(status);
+  PAMBLE_RETURN_IF_ERROR(status);
 
   return PAMBLE_SHA256_OK;
 }

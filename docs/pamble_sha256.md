@@ -363,5 +363,5 @@ The output buffer supplied to `pamble_sha256_final` and `pamble_sha256` therefor
 - The implementation does not depend on the host machine's endianness for SHA-256 word encoding.
 - The streaming API does not require callers to align input to 64-byte boundaries.
 - Finalization does not mutate the caller's context.
-- Internal helper failures are propagated through `RETURN_IF_ERROR`.
+- Internal helper failures are propagated through `PAMBLE_RETURN_IF_ERROR`.
 - The implementation uses fixed-size local arrays for the 64-word message schedule and eight working variables during block processing.
