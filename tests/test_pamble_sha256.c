@@ -77,14 +77,6 @@ Test(pamble_sha256, standard_test_vector) {
       "248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1");
 }
 
-Test(pamble_sha256, null_output_buffer) {
-  static const uint8_t message[] = "abc";
-
-  pamble_status status = pamble_sha256(message, sizeof(message) - 1, NULL);
-
-  cr_assert_eq(status, PAMBLE_INVALID_ARGUMENT);
-}
-
 Test(pamble_sha256, null_message_with_nonzero_length) {
   uint8_t digest[PAMBLE_SHA256_DIGEST_LENGTH];
 

@@ -79,9 +79,6 @@ static const uint32_t K_VALUES[K_VALUES_SIZE] = {
  */
 static pamble_status
 initialize_h_values(uint32_t hash_state[static H_VALUES_SIZE]) {
-  if (hash_state == NULL) {
-    return PAMBLE_INVALID_ARGUMENT;
-  }
 
   memcpy(hash_state, H_VALUES, sizeof(H_VALUES));
 
@@ -100,6 +97,7 @@ initialize_h_values(uint32_t hash_state[static H_VALUES_SIZE]) {
  * @return PAMBLE_INVALID_ARGUMENT if ctx is NULL.
  */
 pamble_status pamble_sha256_init(pamble_sha256_ctx *ctx) {
+
   if (ctx == NULL) {
     return PAMBLE_INVALID_ARGUMENT;
   }
@@ -129,9 +127,6 @@ pamble_status pamble_sha256_init(pamble_sha256_ctx *ctx) {
 static pamble_status
 bytes_to_word(const uint8_t padded_message_block[static BYTES_PER_WORD],
               uint32_t *concatenated_word) {
-  if (padded_message_block == NULL) {
-    return PAMBLE_INVALID_ARGUMENT;
-  }
 
   if (concatenated_word == NULL) {
     return PAMBLE_INVALID_ARGUMENT;
@@ -161,13 +156,6 @@ bytes_to_word(const uint8_t padded_message_block[static BYTES_PER_WORD],
 static pamble_status initialize_initial_words(
     uint32_t words_state[static WORDS_STATE_SIZE],
     const uint8_t padded_message_block[static BYTES_PER_BLOCK]) {
-  if (words_state == NULL) {
-    return PAMBLE_INVALID_ARGUMENT;
-  }
-
-  if (padded_message_block == NULL) {
-    return PAMBLE_INVALID_ARGUMENT;
-  }
 
   for (size_t i = 0; i < INITIAL_WORD_COUNT; i++) {
     pamble_status status = bytes_to_word(
@@ -231,9 +219,6 @@ static uint32_t sigma2(const uint32_t word) {
  */
 static pamble_status
 expand_words_state(uint32_t words_state[static WORDS_STATE_SIZE]) {
-  if (words_state == NULL) {
-    return PAMBLE_INVALID_ARGUMENT;
-  }
 
   for (size_t i = INITIAL_WORD_COUNT; i < WORDS_STATE_SIZE; i++) {
     words_state[i] =
@@ -260,13 +245,6 @@ expand_words_state(uint32_t words_state[static WORDS_STATE_SIZE]) {
 static pamble_status initialize_words_state(
     uint32_t words_state[static WORDS_STATE_SIZE],
     const uint8_t padded_message_block[static BYTES_PER_BLOCK]) {
-  if (words_state == NULL) {
-    return PAMBLE_INVALID_ARGUMENT;
-  }
-
-  if (padded_message_block == NULL) {
-    return PAMBLE_INVALID_ARGUMENT;
-  }
 
   pamble_status status;
 
@@ -294,13 +272,6 @@ static pamble_status initialize_words_state(
 static pamble_status initialize_working_variable_values(
     uint32_t working_variables_state[static WORKING_VARIABLES_SIZE],
     const uint32_t hash_state[static H_VALUES_SIZE]) {
-  if (working_variables_state == NULL) {
-    return PAMBLE_INVALID_ARGUMENT;
-  }
-
-  if (hash_state == NULL) {
-    return PAMBLE_INVALID_ARGUMENT;
-  }
 
   memcpy(working_variables_state, hash_state,
          sizeof(uint32_t) * WORKING_VARIABLES_SIZE);
@@ -319,6 +290,7 @@ static pamble_status initialize_working_variable_values(
  * @param expanded_word Message schedule word for the current round.
  */
 static void sha256_compression_round(
+
     uint32_t working_variables_state[static WORKING_VARIABLES_SIZE],
     uint32_t round_constant, uint32_t expanded_word) {
 
@@ -369,13 +341,6 @@ static void sha256_compression_round(
 static pamble_status words_state_compression(
     const uint32_t words_state[static WORDS_STATE_SIZE],
     uint32_t working_variables_state[static WORKING_VARIABLES_SIZE]) {
-  if (words_state == NULL) {
-    return PAMBLE_INVALID_ARGUMENT;
-  }
-
-  if (working_variables_state == NULL) {
-    return PAMBLE_INVALID_ARGUMENT;
-  }
 
   for (size_t i = 0; i < WORDS_STATE_SIZE; i++) {
     sha256_compression_round(working_variables_state, K_VALUES[i],
@@ -397,13 +362,6 @@ static pamble_status words_state_compression(
 static pamble_status update_hash_state(
     uint32_t hash_state[static H_VALUES_SIZE],
     const uint32_t working_variables_state[static WORKING_VARIABLES_SIZE]) {
-  if (hash_state == NULL) {
-    return PAMBLE_INVALID_ARGUMENT;
-  }
-
-  if (working_variables_state == NULL) {
-    return PAMBLE_INVALID_ARGUMENT;
-  }
 
   for (size_t i = 0; i < H_VALUES_SIZE; i++) {
     hash_state[i] += working_variables_state[i];
@@ -427,13 +385,6 @@ static pamble_status update_hash_state(
 static pamble_status
 process_message_block(const uint8_t block[static BYTES_PER_BLOCK],
                       uint32_t hash_state[static H_VALUES_SIZE]) {
-  if (block == NULL) {
-    return PAMBLE_INVALID_ARGUMENT;
-  }
-
-  if (hash_state == NULL) {
-    return PAMBLE_INVALID_ARGUMENT;
-  }
 
   uint32_t words_state[WORDS_STATE_SIZE];
   uint32_t working_variables_state[WORKING_VARIABLES_SIZE];
@@ -475,6 +426,7 @@ process_message_block(const uint8_t block[static BYTES_PER_BLOCK],
 pamble_status pamble_sha256_update(pamble_sha256_ctx *ctx,
                                    const uint8_t *message,
                                    size_t message_length) {
+
   if (ctx == NULL) {
     return PAMBLE_INVALID_ARGUMENT;
   }
@@ -544,9 +496,6 @@ pamble_status pamble_sha256_update(pamble_sha256_ctx *ctx,
 static pamble_status
 encode_length(uint64_t bit_length,
               uint8_t ctx_buffer[static BYTES_PER_LENGTH_FIELD]) {
-  if (ctx_buffer == NULL) {
-    return PAMBLE_INVALID_ARGUMENT;
-  }
 
   for (size_t i = 0; i < BYTES_PER_LENGTH_FIELD; i++) {
     ctx_buffer[i] = (uint8_t)(bit_length >>
@@ -568,11 +517,8 @@ encode_length(uint64_t bit_length,
 static pamble_status
 word_to_byte(const uint32_t *hash_state_chunk,
              uint8_t output_buffer_chunk[static BYTES_PER_WORD]) {
-  if (hash_state_chunk == NULL) {
-    return PAMBLE_INVALID_ARGUMENT;
-  }
 
-  if (output_buffer_chunk == NULL) {
+  if (hash_state_chunk == NULL) {
     return PAMBLE_INVALID_ARGUMENT;
   }
 
@@ -600,13 +546,6 @@ word_to_byte(const uint32_t *hash_state_chunk,
 static pamble_status
 export_digest(const uint32_t hash_state[static H_VALUES_SIZE],
               uint8_t output_buffer[static PAMBLE_SHA256_DIGEST_LENGTH]) {
-  if (hash_state == NULL) {
-    return PAMBLE_INVALID_ARGUMENT;
-  }
-
-  if (output_buffer == NULL) {
-    return PAMBLE_INVALID_ARGUMENT;
-  }
 
   for (size_t i = 0; i < H_VALUES_SIZE; i++) {
     pamble_status status =
@@ -637,11 +576,8 @@ export_digest(const uint32_t hash_state[static H_VALUES_SIZE],
 pamble_status
 pamble_sha256_final(const pamble_sha256_ctx *ctx,
                     uint8_t output_buffer[static PAMBLE_SHA256_DIGEST_LENGTH]) {
-  if (ctx == NULL) {
-    return PAMBLE_INVALID_ARGUMENT;
-  }
 
-  if (output_buffer == NULL) {
+  if (ctx == NULL) {
     return PAMBLE_INVALID_ARGUMENT;
   }
 
@@ -704,9 +640,6 @@ pamble_sha256_final(const pamble_sha256_ctx *ctx,
 pamble_status
 pamble_sha256(const uint8_t *message, size_t message_length,
               uint8_t output_buffer[static PAMBLE_SHA256_DIGEST_LENGTH]) {
-  if (output_buffer == NULL) {
-    return PAMBLE_INVALID_ARGUMENT;
-  }
 
   if (message == NULL && message_length != 0) {
     return PAMBLE_INVALID_ARGUMENT;
