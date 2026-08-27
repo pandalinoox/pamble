@@ -60,7 +60,7 @@ pamble_status pamble_sha256_update(pamble_sha256_ctx *ctx,
  */
 pamble_status
 pamble_sha256_final(const pamble_sha256_ctx *ctx,
-                    uint8_t output_buffer[PAMBLE_SHA256_DIGEST_LENGTH]);
+                    uint8_t output_buffer[static PAMBLE_SHA256_DIGEST_LENGTH]);
 
 /*
  * @brief Computes the SHA-256 digest of a message.
@@ -79,5 +79,6 @@ pamble_sha256_final(const pamble_sha256_ctx *ctx,
  * @return PAMBLE_SIZE_OVERFLOW if the message length exceeds the
  *         maximum length representable by SHA-256.
  */
-pamble_status pamble_sha256(const uint8_t *message, size_t message_length,
-                            uint8_t output_buffer[PAMBLE_SHA256_DIGEST_LENGTH]);
+pamble_status
+pamble_sha256(const uint8_t *message, size_t message_length,
+              uint8_t output_buffer[static PAMBLE_SHA256_DIGEST_LENGTH]);
