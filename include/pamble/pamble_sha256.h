@@ -1,15 +1,11 @@
 #pragma once
 
+#include "pamble/pamble_status.h"
+
 #include <stddef.h>
 #include <stdint.h>
 
 #define PAMBLE_SHA256_DIGEST_LENGTH 32
-
-typedef enum {
-  PAMBLE_SHA256_OK = 0,
-  PAMBLE_SHA256_INVALID_ARGUMENT,
-  PAMBLE_SHA256_SIZE_OVERFLOW,
-} pamble_sha256_status;
 
 typedef struct pamble_sha256_ctx pamble_sha256_ctx;
 
@@ -21,10 +17,10 @@ typedef struct pamble_sha256_ctx pamble_sha256_ctx;
  *
  * @param ctx SHA-256 context to initialize.
  *
- * @return PAMBLE_SHA256_OK if the context was initialized successfully.
- * @return PAMBLE_SHA256_INVALID_ARGUMENT if ctx is NULL.
+ * @return PAMBLE_OK if the context was initialized successfully.
+ * @return PAMBLE_INVALID_ARGUMENT if ctx is NULL.
  */
-pamble_sha256_status pamble_sha256_init(pamble_sha256_ctx *ctx);
+pamble_status pamble_sha256_init(pamble_sha256_ctx *ctx);
 
 /*
  * @brief Updates a SHA-256 context with message data.
@@ -36,15 +32,15 @@ pamble_sha256_status pamble_sha256_init(pamble_sha256_ctx *ctx);
  * @param message Message data to hash.
  * @param message_length Number of bytes in message.
  *
- * @return PAMBLE_SHA256_OK if the context was updated successfully.
- * @return PAMBLE_SHA256_INVALID_ARGUMENT if ctx is NULL, or if message is NULL
+ * @return PAMBLE_OK if the context was updated successfully.
+ * @return PAMBLE_INVALID_ARGUMENT if ctx is NULL, or if message is NULL
  *         while message_length is non-zero.
- * @return PAMBLE_SHA256_SIZE_OVERFLOW if the message length would exceed the
+ * @return PAMBLE_SIZE_OVERFLOW if the message length would exceed the
  *         maximum length representable by SHA-256.
  */
-pamble_sha256_status pamble_sha256_update(pamble_sha256_ctx *ctx,
-                                          const uint8_t *message,
-                                          size_t message_length);
+pamble_status pamble_sha256_update(pamble_sha256_ctx *ctx,
+                                   const uint8_t *message,
+                                   size_t message_length);
 
 /*
  * @brief Finalizes a SHA-256 computation and produces the digest.
@@ -58,11 +54,11 @@ pamble_sha256_status pamble_sha256_update(pamble_sha256_ctx *ctx,
  * @param ctx SHA-256 context containing the message state.
  * @param output_buffer Output buffer for the 32-byte digest.
  *
- * @return PAMBLE_SHA256_OK if finalization completed successfully.
- * @return PAMBLE_SHA256_INVALID_ARGUMENT if an argument is NULL or the context
+ * @return PAMBLE_OK if finalization completed successfully.
+ * @return PAMBLE_INVALID_ARGUMENT if an argument is NULL or the context
  *         contains an invalid buffered length.
  */
-pamble_sha256_status
+pamble_status
 pamble_sha256_final(const pamble_sha256_ctx *ctx,
                     uint8_t output_buffer[PAMBLE_SHA256_DIGEST_LENGTH]);
 
@@ -77,12 +73,11 @@ pamble_sha256_final(const pamble_sha256_ctx *ctx,
  * @param message_length Number of bytes in message.
  * @param output_buffer Output buffer for the 32-byte digest.
  *
- * @return PAMBLE_SHA256_OK if the digest was computed successfully.
- * @return PAMBLE_SHA256_INVALID_ARGUMENT if output_buffer is NULL, or if
+ * @return PAMBLE_OK if the digest was computed successfully.
+ * @return PAMBLE_INVALID_ARGUMENT if output_buffer is NULL, or if
  *         message is NULL while message_length is non-zero.
- * @return PAMBLE_SHA256_SIZE_OVERFLOW if the message length exceeds the
+ * @return PAMBLE_SIZE_OVERFLOW if the message length exceeds the
  *         maximum length representable by SHA-256.
  */
-pamble_sha256_status
-pamble_sha256(const uint8_t *message, size_t message_length,
-              uint8_t output_buffer[PAMBLE_SHA256_DIGEST_LENGTH]);
+pamble_status pamble_sha256(const uint8_t *message, size_t message_length,
+                            uint8_t output_buffer[PAMBLE_SHA256_DIGEST_LENGTH]);

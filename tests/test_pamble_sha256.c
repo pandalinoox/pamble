@@ -1,9 +1,9 @@
+#include "pamble/pamble_sha256.h"
+
 #include <criterion/criterion.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-
-#include "pamble/pamble_sha256.h"
 
 #define PAMBLE_HEX_BASE 16
 
@@ -28,9 +28,9 @@ static void assert_digest(const uint8_t actual[PAMBLE_SHA256_DIGEST_LENGTH],
 Test(pamble_sha256, empty_message) {
   uint8_t digest[PAMBLE_SHA256_DIGEST_LENGTH];
 
-  pamble_sha256_status status = pamble_sha256(NULL, 0, digest);
+  pamble_status status = pamble_sha256(NULL, 0, digest);
 
-  cr_assert_eq(status, PAMBLE_SHA256_OK);
+  cr_assert_eq(status, PAMBLE_OK);
 
   assert_digest(
       digest,
@@ -41,10 +41,9 @@ Test(pamble_sha256, single_byte) {
   static const uint8_t message[] = "a";
   uint8_t digest[PAMBLE_SHA256_DIGEST_LENGTH];
 
-  pamble_sha256_status status =
-      pamble_sha256(message, sizeof(message) - 1, digest);
+  pamble_status status = pamble_sha256(message, sizeof(message) - 1, digest);
 
-  cr_assert_eq(status, PAMBLE_SHA256_OK);
+  cr_assert_eq(status, PAMBLE_OK);
 
   assert_digest(digest, "ca978112ca1bbdcafac231b39a23dc4d"
                         "a786eff8147c4e72b9807785afee48bb");
@@ -54,10 +53,9 @@ Test(pamble_sha256, abc) {
   static const uint8_t message[] = "abc";
   uint8_t digest[PAMBLE_SHA256_DIGEST_LENGTH];
 
-  pamble_sha256_status status =
-      pamble_sha256(message, sizeof(message) - 1, digest);
+  pamble_status status = pamble_sha256(message, sizeof(message) - 1, digest);
 
-  cr_assert_eq(status, PAMBLE_SHA256_OK);
+  cr_assert_eq(status, PAMBLE_OK);
 
   assert_digest(
       digest,
@@ -70,10 +68,9 @@ Test(pamble_sha256, standard_test_vector) {
 
   uint8_t digest[PAMBLE_SHA256_DIGEST_LENGTH];
 
-  pamble_sha256_status status =
-      pamble_sha256(message, sizeof(message) - 1, digest);
+  pamble_status status = pamble_sha256(message, sizeof(message) - 1, digest);
 
-  cr_assert_eq(status, PAMBLE_SHA256_OK);
+  cr_assert_eq(status, PAMBLE_OK);
 
   assert_digest(
       digest,
@@ -83,26 +80,25 @@ Test(pamble_sha256, standard_test_vector) {
 Test(pamble_sha256, null_output_buffer) {
   static const uint8_t message[] = "abc";
 
-  pamble_sha256_status status =
-      pamble_sha256(message, sizeof(message) - 1, NULL);
+  pamble_status status = pamble_sha256(message, sizeof(message) - 1, NULL);
 
-  cr_assert_eq(status, PAMBLE_SHA256_INVALID_ARGUMENT);
+  cr_assert_eq(status, PAMBLE_INVALID_ARGUMENT);
 }
 
 Test(pamble_sha256, null_message_with_nonzero_length) {
   uint8_t digest[PAMBLE_SHA256_DIGEST_LENGTH];
 
-  pamble_sha256_status status = pamble_sha256(NULL, 3, digest);
+  pamble_status status = pamble_sha256(NULL, 3, digest);
 
-  cr_assert_eq(status, PAMBLE_SHA256_INVALID_ARGUMENT);
+  cr_assert_eq(status, PAMBLE_INVALID_ARGUMENT);
 }
 
 Test(pamble_sha256, null_message_with_zero_length) {
   uint8_t digest[PAMBLE_SHA256_DIGEST_LENGTH];
 
-  pamble_sha256_status status = pamble_sha256(NULL, 0, digest);
+  pamble_status status = pamble_sha256(NULL, 0, digest);
 
-  cr_assert_eq(status, PAMBLE_SHA256_OK);
+  cr_assert_eq(status, PAMBLE_OK);
 
   assert_digest(
       digest,

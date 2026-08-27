@@ -17,6 +17,19 @@ The implementation follows the SHA-256 block-processing model:
 
 The implementation uses 32-bit words, 64-byte message blocks, and a 64-bit message-length field.
 
+## Status Interface
+
+The common Pamble status interface is documented separately in [`pamble_status.md`](pamble_status.md).
+
+The SHA-256 API uses `pamble_status` for success and error reporting. This includes argument validation, SHA-256 message-size overflow detection, and propagation of internal helper failures.
+
+See [`pamble_status.md`](pamble_status.md) for:
+
+- The complete `pamble_status` enum.
+- The meaning of each status value.
+- The `PAMBLE_RETURN_IF_ERROR` propagation macro.
+- General status-handling conventions used throughout Pamble.
+
 ## API
 
 ### `pamble_sha256_init`
@@ -24,7 +37,7 @@ The implementation uses 32-bit words, 64-byte message blocks, and a 64-bit messa
 Initializes a SHA-256 context.
 
 ```c
-pamble_sha256_status pamble_sha256_init(pamble_sha256_ctx *ctx);
+pamble_status pamble_sha256_init(pamble_sha256_ctx *ctx);
 ```
 
 The function:
@@ -34,14 +47,14 @@ The function:
 - Clears the total message length.
 - Clears the internal 64-byte buffer.
 
-Passing `NULL` as `ctx` returns `PAMBLE_SHA256_INVALID_ARGUMENT`.
+Passing `NULL` as `ctx` returns `PAMBLE_INVALID_ARGUMENT`.
 
 ### `pamble_sha256_update`
 
 Adds message data to an existing SHA-256 computation.
 
 ```c
-pamble_sha256_status pamble_sha256_update(
+pamble_status pamble_sha256_update(
     pamble_sha256_ctx *ctx,
     const uint8_t *message,
     size_t message_length
@@ -56,16 +69,16 @@ The update operation handles input in three stages:
 
 The context tracks the total message length in bytes.
 
-`message` may be `NULL` when `message_length` is zero. A `NULL` message with a non-zero length returns `PAMBLE_SHA256_INVALID_ARGUMENT`.
+`message` may be `NULL` when `message_length` is zero. A `NULL` message with a non-zero length returns `PAMBLE_INVALID_ARGUMENT`.
 
-If the message length would exceed the maximum length representable by SHA-256, the function returns `PAMBLE_SHA256_SIZE_OVERFLOW`.
+If the message length would exceed the maximum length representable by SHA-256, the function returns `PAMBLE_SIZE_OVERFLOW`.
 
 ### `pamble_sha256_final`
 
 Finalizes a SHA-256 computation and writes the digest.
 
 ```c
-pamble_sha256_status pamble_sha256_final(
+pamble_status pamble_sha256_final(
     const pamble_sha256_ctx *ctx,
     uint8_t output_buffer[PAMBLE_SHA256_DIGEST_LENGTH]
 );
@@ -82,14 +95,14 @@ The finalization process:
 5. Processes the final block, or two final blocks when necessary.
 6. Converts the eight hash-state words into the 32-byte digest.
 
-A buffered length greater than or equal to 64 bytes is treated as an invalid context and returns `PAMBLE_SHA256_INVALID_ARGUMENT`.
+A buffered length greater than or equal to 64 bytes is treated as an invalid context and returns `PAMBLE_INVALID_ARGUMENT`.
 
 ### `pamble_sha256`
 
 Provides the one-shot SHA-256 interface.
 
 ```c
-pamble_sha256_status pamble_sha256(
+pamble_status pamble_sha256(
     const uint8_t *message,
     size_t message_length,
     uint8_t output_buffer[PAMBLE_SHA256_DIGEST_LENGTH]
@@ -242,28 +255,11 @@ The implementation explicitly performs these conversions rather than relying on 
 
 ## Error Handling
 
-The implementation uses `pamble_sha256_status` return values throughout the API and internal helpers.
+Error reporting for the SHA-256 API is provided by Pamble's common status interface.
 
-The relevant errors exposed by the implementation are:
+See [`pamble_status.md`](pamble_status.md) for the complete list of status codes, their meanings, and the `PAMBLE_RETURN_IF_ERROR` propagation convention.
 
-### `PAMBLE_SHA256_OK`
-
-The operation completed successfully.
-
-### `PAMBLE_SHA256_INVALID_ARGUMENT`
-
-Returned for invalid arguments, including:
-
-- A `NULL` SHA-256 context passed to initialization or update.
-- A `NULL` message when the message length is non-zero.
-- A `NULL` output buffer.
-- Invalid internal buffer length during finalization.
-
-Internal helper functions also validate their pointer arguments and propagate this status to their callers.
-
-### `PAMBLE_SHA256_SIZE_OVERFLOW`
-
-Returned by `pamble_sha256_update` when adding the supplied message length would exceed the maximum message length representable by SHA-256.
+The SHA-256 implementation uses `pamble_status` consistently across its public API and internal helper functions. Internal helper failures are propagated through their callers using `PAMBLE_RETURN_IF_ERROR`.
 
 ## Streaming Usage
 
@@ -363,5 +359,6 @@ The output buffer supplied to `pamble_sha256_final` and `pamble_sha256` therefor
 - The implementation does not depend on the host machine's endianness for SHA-256 word encoding.
 - The streaming API does not require callers to align input to 64-byte boundaries.
 - Finalization does not mutate the caller's context.
+- `pamble_status` provides the common success and error-reporting mechanism for the public API and internal helpers.
 - Internal helper failures are propagated through `PAMBLE_RETURN_IF_ERROR`.
 - The implementation uses fixed-size local arrays for the 64-word message schedule and eight working variables during block processing.
