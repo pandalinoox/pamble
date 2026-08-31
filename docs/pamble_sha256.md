@@ -21,7 +21,7 @@ The implementation uses 32-bit words, 64-byte message blocks, and a 64-bit messa
 
 The common Pamble status interface is documented separately in [`pamble_status.md`](pamble_status.md).
 
-The SHA-256 API uses `pamble_status` for success and error reporting. This includes argument validation, SHA-256 message-size overflow detection, and propagation of internal helper failures.
+The SHA-256 API uses `pamble_status` for success and error reporting on its four public functions. This includes argument validation and SHA-256 message-size overflow detection. Internal helper functions have no fallible preconditions given how they are invoked, so they do not return `pamble_status`.
 
 See [`pamble_status.md`](pamble_status.md) for:
 
@@ -259,7 +259,7 @@ Error reporting for the SHA-256 API is provided by Pamble's common status interf
 
 See [`pamble_status.md`](pamble_status.md) for the complete list of status codes, their meanings, and the `PAMBLE_RETURN_IF_ERROR` propagation convention.
 
-The SHA-256 implementation uses `pamble_status` consistently across its public API and internal helper functions. Internal helper failures are propagated through their callers using `PAMBLE_RETURN_IF_ERROR`.
+The SHA-256 implementation uses `pamble_status` on its four public functions — `pamble_sha256_init`, `pamble_sha256_update`, `pamble_sha256_final`, and `pamble_sha256` — each of which propagates the others' failures using `PAMBLE_RETURN_IF_ERROR`. Internal helper functions (message-schedule expansion, compression, padding, digest export, and so on) always succeed given the arguments the implementation passes them, so they return `void` rather than `pamble_status`.
 
 ## Streaming Usage
 
@@ -359,6 +359,7 @@ The output buffer supplied to `pamble_sha256_final` and `pamble_sha256` therefor
 - The implementation does not depend on the host machine's endianness for SHA-256 word encoding.
 - The streaming API does not require callers to align input to 64-byte boundaries.
 - Finalization does not mutate the caller's context.
-- `pamble_status` provides the common success and error-reporting mechanism for the public API and internal helpers.
-- Internal helper failures are propagated through `PAMBLE_RETURN_IF_ERROR`.
+- `pamble_status` provides the common success and error-reporting mechanism for the four public API functions.
+- Failures from one public API function are propagated by another through `PAMBLE_RETURN_IF_ERROR`.
+- Internal helper functions return `void`, since none of them have a reachable failure path given how the implementation calls them.
 - The implementation uses fixed-size local arrays for the 64-word message schedule and eight working variables during block processing.

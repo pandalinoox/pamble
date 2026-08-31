@@ -74,15 +74,10 @@ static const uint32_t K_VALUES[K_VALUES_SIZE] = {
  *
  * @param hash_state Array containing the hash state to initialize.
  *
- * @return PAMBLE_OK if the hash state was initialized successfully.
- * @return PAMBLE_INVALID_ARGUMENT if hash_state is NULL.
  */
-static pamble_status
-initialize_h_values(uint32_t hash_state[static H_VALUES_SIZE]) {
+static void initialize_h_values(uint32_t hash_state[static H_VALUES_SIZE]) {
 
   memcpy(hash_state, H_VALUES, sizeof(H_VALUES));
-
-  return PAMBLE_OK;
 }
 
 /*
@@ -102,9 +97,7 @@ pamble_status pamble_sha256_init(pamble_sha256_ctx *ctx) {
     return PAMBLE_INVALID_ARGUMENT;
   }
 
-  pamble_status status = initialize_h_values(ctx->hash_state);
-
-  PAMBLE_RETURN_IF_ERROR(status);
+  initialize_h_values(ctx->hash_state);
 
   ctx->buffer_length = 0;
   ctx->message_length = 0;
@@ -120,17 +113,10 @@ pamble_status pamble_sha256_init(pamble_sha256_ctx *ctx) {
  * @param padded_message_block Four bytes containing the word in big-endian
  *                            order.
  * @param concatenated_word Output location for the resulting 32-bit word.
- *
- * @return PAMBLE_OK if the word was converted successfully.
- * @return PAMBLE_INVALID_ARGUMENT if an argument is NULL.
  */
-static pamble_status
+static void
 bytes_to_word(const uint8_t padded_message_block[static BYTES_PER_WORD],
               uint32_t *concatenated_word) {
-
-  if (concatenated_word == NULL) {
-    return PAMBLE_INVALID_ARGUMENT;
-  }
 
   *concatenated_word = 0;
 
@@ -138,8 +124,6 @@ bytes_to_word(const uint8_t padded_message_block[static BYTES_PER_WORD],
     *concatenated_word |= (uint32_t)padded_message_block[i]
                           << (BYTES_PER_WORD - i - 1) * BITS_PER_BYTE;
   }
-
-  return PAMBLE_OK;
 }
 
 /*
@@ -149,22 +133,14 @@ bytes_to_word(const uint8_t padded_message_block[static BYTES_PER_WORD],
  *
  * @param words_state Message schedule to initialize.
  * @param padded_message_block 512-bit message block.
- *
- * @return PAMBLE_OK if the initial words were initialized successfully.
- * @return PAMBLE_INVALID_ARGUMENT if an argument is NULL.
  */
-static pamble_status initialize_initial_words(
+static void initialize_initial_words(
     uint32_t words_state[static WORDS_STATE_SIZE],
     const uint8_t padded_message_block[static BYTES_PER_BLOCK]) {
 
   for (size_t i = 0; i < INITIAL_WORD_COUNT; i++) {
-    pamble_status status = bytes_to_word(
-        &padded_message_block[i * BYTES_PER_WORD], &words_state[i]);
-
-    PAMBLE_RETURN_IF_ERROR(status);
+    bytes_to_word(&padded_message_block[i * BYTES_PER_WORD], &words_state[i]);
   }
-
-  return PAMBLE_OK;
 }
 
 /*
@@ -213,20 +189,14 @@ static uint32_t sigma2(const uint32_t word) {
  * @brief Expands the first 16 message words into the complete 64-word schedule.
  *
  * @param words_state Message schedule containing the initial 16 words.
- *
- * @return PAMBLE_OK if the message schedule was expanded successfully.
- * @return PAMBLE_INVALID_ARGUMENT if words_state is NULL.
  */
-static pamble_status
-expand_words_state(uint32_t words_state[static WORDS_STATE_SIZE]) {
+static void expand_words_state(uint32_t words_state[static WORDS_STATE_SIZE]) {
 
   for (size_t i = INITIAL_WORD_COUNT; i < WORDS_STATE_SIZE; i++) {
     words_state[i] =
         words_state[i - OFFSET_W16] + sigma1(words_state[i - OFFSET_W15]) +
         words_state[i - OFFSET_W7] + sigma2(words_state[i - OFFSET_W2]);
   }
-
-  return PAMBLE_OK;
 }
 
 /*
@@ -237,24 +207,13 @@ expand_words_state(uint32_t words_state[static WORDS_STATE_SIZE]) {
  *
  * @param words_state Message schedule to initialize.
  * @param padded_message_block 512-bit message block.
- *
- * @return PAMBLE_OK if the message schedule was initialized
- * successfully.
- * @return PAMBLE_INVALID_ARGUMENT if an argument is NULL.
  */
-static pamble_status initialize_words_state(
+static void initialize_words_state(
     uint32_t words_state[static WORDS_STATE_SIZE],
     const uint8_t padded_message_block[static BYTES_PER_BLOCK]) {
 
-  pamble_status status;
-
-  status = initialize_initial_words(words_state, padded_message_block);
-  PAMBLE_RETURN_IF_ERROR(status);
-
-  status = expand_words_state(words_state);
-  PAMBLE_RETURN_IF_ERROR(status);
-
-  return PAMBLE_OK;
+  initialize_initial_words(words_state, padded_message_block);
+  expand_words_state(words_state);
 }
 
 /*
@@ -264,19 +223,13 @@ static pamble_status initialize_words_state(
  *
  * @param working_variables_state Working variables to initialize.
  * @param hash_state Current SHA-256 hash state.
- *
- * @return PAMBLE_OK if the working variables were initialized
- *         successfully.
- * @return PAMBLE_INVALID_ARGUMENT if an argument is NULL.
  */
-static pamble_status initialize_working_variable_values(
+static void initialize_working_variable_values(
     uint32_t working_variables_state[static WORKING_VARIABLES_SIZE],
     const uint32_t hash_state[static H_VALUES_SIZE]) {
 
   memcpy(working_variables_state, hash_state,
          sizeof(uint32_t) * WORKING_VARIABLES_SIZE);
-
-  return PAMBLE_OK;
 }
 
 /*
@@ -334,11 +287,8 @@ static void sha256_compression_round(
  *
  * @param words_state Expanded 64-word message schedule.
  * @param working_variables_state Working variables for the compression.
- *
- * @return PAMBLE_OK if compression completed successfully.
- * @return PAMBLE_INVALID_ARGUMENT if an argument is NULL.
  */
-static pamble_status words_state_compression(
+static void words_state_compression(
     const uint32_t words_state[static WORDS_STATE_SIZE],
     uint32_t working_variables_state[static WORKING_VARIABLES_SIZE]) {
 
@@ -346,8 +296,6 @@ static pamble_status words_state_compression(
     sha256_compression_round(working_variables_state, K_VALUES[i],
                              words_state[i]);
   }
-
-  return PAMBLE_OK;
 }
 
 /*
@@ -355,19 +303,14 @@ static pamble_status words_state_compression(
  *
  * @param hash_state Current SHA-256 hash state.
  * @param working_variables_state Compressed working variables.
- *
- * @return PAMBLE_OK if the hash state was updated successfully.
- * @return PAMBLE_INVALID_ARGUMENT if an argument is NULL.
  */
-static pamble_status update_hash_state(
+static void update_hash_state(
     uint32_t hash_state[static H_VALUES_SIZE],
     const uint32_t working_variables_state[static WORKING_VARIABLES_SIZE]) {
 
   for (size_t i = 0; i < H_VALUES_SIZE; i++) {
     hash_state[i] += working_variables_state[i];
   }
-
-  return PAMBLE_OK;
 }
 
 /*
@@ -378,33 +321,17 @@ static pamble_status update_hash_state(
  *
  * @param block 512-bit message block to process.
  * @param hash_state SHA-256 hash state to update.
- *
- * @return PAMBLE_OK if the block was processed successfully.
- * @return PAMBLE_INVALID_ARGUMENT if an argument is NULL.
  */
-static pamble_status
-process_message_block(const uint8_t block[static BYTES_PER_BLOCK],
-                      uint32_t hash_state[static H_VALUES_SIZE]) {
+static void process_message_block(const uint8_t block[static BYTES_PER_BLOCK],
+                                  uint32_t hash_state[static H_VALUES_SIZE]) {
 
   uint32_t words_state[WORDS_STATE_SIZE];
   uint32_t working_variables_state[WORKING_VARIABLES_SIZE];
 
-  pamble_status status;
-
-  status = initialize_words_state(words_state, block);
-  PAMBLE_RETURN_IF_ERROR(status);
-
-  status =
-      initialize_working_variable_values(working_variables_state, hash_state);
-  PAMBLE_RETURN_IF_ERROR(status);
-
-  status = words_state_compression(words_state, working_variables_state);
-  PAMBLE_RETURN_IF_ERROR(status);
-
-  status = update_hash_state(hash_state, working_variables_state);
-  PAMBLE_RETURN_IF_ERROR(status);
-
-  return PAMBLE_OK;
+  initialize_words_state(words_state, block);
+  initialize_working_variable_values(working_variables_state, hash_state);
+  words_state_compression(words_state, working_variables_state);
+  update_hash_state(hash_state, working_variables_state);
 }
 
 /*
@@ -453,20 +380,14 @@ pamble_status pamble_sha256_update(pamble_sha256_ctx *ctx,
     message_offset += to_copy;
 
     if (ctx->buffer_length == BYTES_PER_BLOCK) {
-      pamble_status status =
-          process_message_block(ctx->buffer, ctx->hash_state);
-
-      PAMBLE_RETURN_IF_ERROR(status);
+      process_message_block(ctx->buffer, ctx->hash_state);
 
       ctx->buffer_length = 0;
     }
   }
 
   while (message_length - message_offset >= BYTES_PER_BLOCK) {
-    pamble_status status =
-        process_message_block(message + message_offset, ctx->hash_state);
-
-    PAMBLE_RETURN_IF_ERROR(status);
+    process_message_block(message + message_offset, ctx->hash_state);
 
     message_offset += BYTES_PER_BLOCK;
   }
@@ -489,20 +410,14 @@ pamble_status pamble_sha256_update(pamble_sha256_ctx *ctx,
  *
  * @param bit_length Message length in bits.
  * @param ctx_buffer Output buffer for the encoded length.
- *
- * @return PAMBLE_OK if the length was encoded successfully.
- * @return PAMBLE_INVALID_ARGUMENT if ctx_buffer is NULL.
  */
-static pamble_status
-encode_length(uint64_t bit_length,
-              uint8_t ctx_buffer[static BYTES_PER_LENGTH_FIELD]) {
+static void encode_length(uint64_t bit_length,
+                          uint8_t ctx_buffer[static BYTES_PER_LENGTH_FIELD]) {
 
   for (size_t i = 0; i < BYTES_PER_LENGTH_FIELD; i++) {
     ctx_buffer[i] = (uint8_t)(bit_length >>
                               (BYTES_PER_LENGTH_FIELD - i - 1) * BITS_PER_BYTE);
   }
-
-  return PAMBLE_OK;
 }
 
 /*
@@ -510,25 +425,15 @@ encode_length(uint64_t bit_length,
  *
  * @param hash_state_chunk Hash state word to convert.
  * @param output_buffer_chunk Output buffer for the resulting bytes.
- *
- * @return PAMBLE_OK if the word was converted successfully.
- * @return PAMBLE_INVALID_ARGUMENT if an argument is NULL.
  */
-static pamble_status
-word_to_byte(const uint32_t *hash_state_chunk,
-             uint8_t output_buffer_chunk[static BYTES_PER_WORD]) {
-
-  if (hash_state_chunk == NULL) {
-    return PAMBLE_INVALID_ARGUMENT;
-  }
+static void word_to_byte(const uint32_t *hash_state_chunk,
+                         uint8_t output_buffer_chunk[static BYTES_PER_WORD]) {
 
   for (size_t i = 0; i < BYTES_PER_WORD; i++) {
     output_buffer_chunk[i] =
         (uint8_t)(*hash_state_chunk >>
                   (BYTES_PER_WORD - i - 1) * BITS_PER_BYTE);
   }
-
-  return PAMBLE_OK;
 }
 
 /*
@@ -539,22 +444,14 @@ word_to_byte(const uint32_t *hash_state_chunk,
  *
  * @param hash_state Final SHA-256 hash state.
  * @param output_buffer Output buffer for the 32-byte digest.
- *
- * @return PAMBLE_OK if the digest was exported successfully.
- * @return PAMBLE_INVALID_ARGUMENT if an argument is NULL.
  */
-static pamble_status
+static void
 export_digest(const uint32_t hash_state[static H_VALUES_SIZE],
               uint8_t output_buffer[static PAMBLE_SHA256_DIGEST_LENGTH]) {
 
   for (size_t i = 0; i < H_VALUES_SIZE; i++) {
-    pamble_status status =
-        word_to_byte(&hash_state[i], &output_buffer[i * BYTES_PER_WORD]);
-
-    PAMBLE_RETURN_IF_ERROR(status);
+    word_to_byte(&hash_state[i], &output_buffer[i * BYTES_PER_WORD]);
   }
-
-  return PAMBLE_OK;
 }
 
 /*
@@ -595,10 +492,7 @@ pamble_sha256_final(const pamble_sha256_ctx *ctx,
     memset(final_ctx.buffer + final_ctx.buffer_length, 0,
            BYTES_PER_BLOCK - final_ctx.buffer_length);
 
-    pamble_status status =
-        process_message_block(final_ctx.buffer, final_ctx.hash_state);
-
-    PAMBLE_RETURN_IF_ERROR(status);
+    process_message_block(final_ctx.buffer, final_ctx.hash_state);
 
     final_ctx.buffer_length = 0;
   }
@@ -606,16 +500,12 @@ pamble_sha256_final(const pamble_sha256_ctx *ctx,
   memset(final_ctx.buffer + final_ctx.buffer_length, 0,
          (BYTES_PER_BLOCK - BYTES_PER_LENGTH_FIELD) - final_ctx.buffer_length);
 
-  pamble_status status = encode_length(
-      bit_length, &final_ctx.buffer[BYTES_PER_BLOCK - BYTES_PER_LENGTH_FIELD]);
+  encode_length(bit_length,
+                &final_ctx.buffer[BYTES_PER_BLOCK - BYTES_PER_LENGTH_FIELD]);
 
-  PAMBLE_RETURN_IF_ERROR(status);
+  process_message_block(final_ctx.buffer, final_ctx.hash_state);
 
-  status = process_message_block(final_ctx.buffer, final_ctx.hash_state);
-  PAMBLE_RETURN_IF_ERROR(status);
-
-  status = export_digest(final_ctx.hash_state, output_buffer);
-  PAMBLE_RETURN_IF_ERROR(status);
+  export_digest(final_ctx.hash_state, output_buffer);
 
   return PAMBLE_OK;
 }
