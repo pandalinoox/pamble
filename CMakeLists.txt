@@ -22,6 +22,7 @@ add_executable(pamble
     src/main.c
     src/pamble_sha256.c
     src/pamble_hmac_sha256.c
+    src/pamble_pbkdf2.c
 )
 
 target_include_directories(pamble
@@ -37,8 +38,10 @@ pkg_check_modules(CRITERION REQUIRED criterion)
 add_executable(pamble_tests
     tests/test_pamble_sha256.c
     tests/test_pamble_hmac_sha256.c
+    tests/test_pamble_pdkdf2.c
     src/pamble_sha256.c
     src/pamble_hmac_sha256.c
+    src/pamble_pbkdf2.c
 )
 
 target_include_directories(pamble_tests
