@@ -83,7 +83,7 @@ yielding the standard 4-byte big-endian representation of `block_no` used as `IN
 
 ### Concatenation
 
-The implementation's `array_concat` function (mirroring the helper of the same name in `pamble_hmac_sha256`) builds the salt input required for each block's first HMAC application: the salt followed by the 4-byte big-endian block index. The concatenation is built into a stack buffer sized to the exact combined length before being passed to `pamble_hmac_sha256`.
+The implementation's `array_concat` function (mirroring the helper of the same name in `pamble_hmac_sha256`) builds the salt input required for each block's first HMAC application: the salt followed by the 4-byte big-endian block index. The concatenation is built into a stack buffer sized to the exact combined length before being passed to `pamble_hmac_sha256`. An empty salt (which may be `NULL`) is skipped rather than passed to `memcpy`, since `memcpy` with a `NULL` pointer is undefined behavior even when the length is zero.
 
 ### Per-Block Iteration
 

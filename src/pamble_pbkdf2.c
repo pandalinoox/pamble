@@ -24,6 +24,9 @@ static void int32_be(uint32_t block_no,
 /*
  * @brief Concatenates two byte arrays into a single output buffer.
  *
+ * Either array may be NULL when its length is zero; empty arrays are skipped
+ * so memcpy is never called with a NULL pointer.
+ *
  * @param arr1 First array.
  * @param arr1_length Number of bytes in arr1.
  * @param arr2 Second array.
@@ -34,8 +37,12 @@ static void int32_be(uint32_t block_no,
 static void array_concat(const uint8_t *arr1, size_t arr1_length,
                          const uint8_t *arr2, size_t arr2_length,
                          uint8_t output_buffer[arr1_length + arr2_length]) {
-  memcpy(output_buffer, arr1, arr1_length);
-  memcpy(output_buffer + arr1_length, arr2, arr2_length);
+  if (arr1_length != 0) {
+    memcpy(output_buffer, arr1, arr1_length);
+  }
+  if (arr2_length != 0) {
+    memcpy(output_buffer + arr1_length, arr2, arr2_length);
+  }
 }
 
 /*

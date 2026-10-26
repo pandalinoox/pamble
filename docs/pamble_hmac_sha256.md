@@ -65,7 +65,7 @@ Because the entire message is provided up front, there is no streaming interface
 HMAC requires a key exactly one block (64 bytes) long. The implementation's `normalize_key` function produces this from a key of any length:
 
 - If the key is longer than 64 bytes, it is hashed with `pamble_sha256`, and the 32-byte digest becomes the normalized key.
-- If the key is 64 bytes or shorter, it is copied as-is.
+- If the key is 64 bytes or shorter, it is copied as-is. An empty key (which may be `NULL`) copies nothing, so `memcpy` is never called with a `NULL` source.
 - The remaining bytes of the 64-byte buffer are zero-filled.
 
 A `NULL` key with a non-zero `key_length` returns `PAMBLE_INVALID_ARGUMENT`. A hashing failure while normalizing an oversized key is propagated to the caller.
@@ -87,6 +87,8 @@ The implementation's `array_concat` function builds the two hash inputs required
 
 - The inner hash input: the 64-byte inner key followed by the message.
 - The outer hash input: the 64-byte outer key followed by the 32-byte inner hash.
+
+Empty arrays are skipped rather than passed to `memcpy`, since `message` may be `NULL` when `message_length` is zero and `memcpy` with a `NULL` pointer is undefined behavior even when the length is zero.
 
 Both concatenations are built into stack buffers sized to the exact combined length before being passed to `pamble_sha256`.
 

@@ -13,8 +13,8 @@
  * @brief Normalizes an HMAC key to a single block length.
  *
  * Keys longer than the block size are hashed with SHA-256; shorter keys are
- * copied as-is. The result is right-padded with zero bytes to fill a full
- * block.
+ * copied as-is (an empty, possibly NULL, key copies nothing). The result is
+ * right-padded with zero bytes to fill a full block.
  *
  * @param key Key data to normalize.
  * @param key_length Number of bytes in key.
@@ -41,7 +41,9 @@ normalize_key(const uint8_t *key, size_t key_length,
     PAMBLE_RETURN_IF_ERROR(status);
     normalized_length = PAMBLE_SHA256_DIGEST_LENGTH;
   } else {
-    memcpy(normalized_key, key, key_length);
+    if (key_length != 0) {
+      memcpy(normalized_key, key, key_length);
+    }
     normalized_length = key_length;
   }
 
@@ -73,6 +75,9 @@ static void key_xor(const uint8_t normalized_key[static BYTES_PER_BLOCK],
 /*
  * @brief Concatenates two byte arrays into a single output buffer.
  *
+ * Either array may be NULL when its length is zero; empty arrays are skipped
+ * so memcpy is never called with a NULL pointer.
+ *
  * @param arr1 First array.
  * @param arr1_length Number of bytes in arr1.
  * @param arr2 Second array.
@@ -83,8 +88,12 @@ static void key_xor(const uint8_t normalized_key[static BYTES_PER_BLOCK],
 static void array_concat(const uint8_t *arr1, size_t arr1_length,
                          const uint8_t *arr2, size_t arr2_length,
                          uint8_t output_buffer[arr1_length + arr2_length]) {
-  memcpy(output_buffer, arr1, arr1_length);
-  memcpy(output_buffer + arr1_length, arr2, arr2_length);
+  if (arr1_length != 0) {
+    memcpy(output_buffer, arr1, arr1_length);
+  }
+  if (arr2_length != 0) {
+    memcpy(output_buffer + arr1_length, arr2, arr2_length);
+  }
 }
 
 /*
