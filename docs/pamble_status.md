@@ -11,13 +11,15 @@ The status definition is provided by:
 
 ## `pamble_status`
 
-The current status enum contains three values:
+The current status enum contains five values:
 
 ```c
 typedef enum {
   PAMBLE_OK = 0,
   PAMBLE_INVALID_ARGUMENT,
   PAMBLE_SIZE_OVERFLOW,
+  PAMBLE_IO_ERROR,
+  PAMBLE_INVALID_ARCHIVE,
 } pamble_status;
 ```
 
@@ -46,6 +48,25 @@ representable by SHA-256.
 
 The current SHA-256 implementation checks this in `pamble_sha256_update`
 before processing the supplied message.
+
+The archive API also returns it when an archive path exceeds `UINT16_MAX`
+bytes, a file is too large to buffer, or an allocation fails.
+
+### `PAMBLE_IO_ERROR`
+
+Indicates that a filesystem operation failed.
+
+The archive API returns this when a path cannot be inspected, opened,
+listed, read, created, written, or given its permission bits, and when
+extraction would overwrite an existing file.
+
+### `PAMBLE_INVALID_ARCHIVE`
+
+Indicates that archive data is malformed or unsafe to extract.
+
+The archive API returns this for a truncated archive, a bad magic or
+version, an unknown entry type, invalid mode bits, a directory with
+content, an unsafe path, or bytes after the end marker.
 
 ## Error Propagation
 

@@ -23,11 +23,17 @@ add_executable(pamble
     src/pamble_sha256.c
     src/pamble_hmac_sha256.c
     src/pamble_pbkdf2.c
+    src/pamble_archive.c
 )
 
 target_include_directories(pamble
     PRIVATE
         ${PROJECT_SOURCE_DIR}/include
+)
+
+target_compile_definitions(pamble
+    PRIVATE
+        _POSIX_C_SOURCE=200809L
 )
 
 enable_testing()
@@ -39,15 +45,23 @@ add_executable(pamble_tests
     tests/test_pamble_sha256.c
     tests/test_pamble_hmac_sha256.c
     tests/test_pamble_pdkdf2.c
+    tests/test_pamble_archive.c
     src/pamble_sha256.c
     src/pamble_hmac_sha256.c
     src/pamble_pbkdf2.c
+    src/pamble_archive.c
 )
 
 target_include_directories(pamble_tests
     PRIVATE
         ${PROJECT_SOURCE_DIR}/include
         ${CRITERION_INCLUDE_DIRS}
+)
+
+target_compile_definitions(pamble_tests
+    PRIVATE
+        _POSIX_C_SOURCE=200809L
+        _XOPEN_SOURCE=700
 )
 
 target_link_directories(pamble_tests
