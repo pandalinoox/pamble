@@ -15,8 +15,11 @@
 
 static void hex_to_bytes(const char *hex, uint8_t *bytes, size_t length) {
   for (size_t i = 0; i < length; ++i) {
-    char byte_string[HEX_BYTE_STRING_LENGTH] = {hex[i * 2], hex[(i * 2) + 1],
-                                                '\0'};
+    char byte_string[HEX_BYTE_STRING_LENGTH] = {
+        hex[i * 2],
+        hex[(i * 2) + 1],
+        '\0',
+    };
 
     bytes[i] = (uint8_t)strtoul(byte_string, NULL, PAMBLE_HEX_BASE);
   }

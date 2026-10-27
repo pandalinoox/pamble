@@ -21,8 +21,11 @@
 
 static void hex_to_bytes(const char *hex, uint8_t *bytes, size_t length) {
   for (size_t i = 0; i < length; ++i) {
-    char byte_string[HEX_BYTE_STRING_LENGTH] = {hex[i * 2], hex[(i * 2) + 1],
-                                                '\0'};
+    char byte_string[HEX_BYTE_STRING_LENGTH] = {
+        hex[i * 2],
+        hex[(i * 2) + 1],
+        '\0',
+    };
 
     bytes[i] = (uint8_t)strtoul(byte_string, NULL, PAMBLE_HEX_BASE);
   }
@@ -41,7 +44,8 @@ static void assert_mac(const uint8_t actual[PAMBLE_SHA256_DIGEST_LENGTH],
 Test(pamble_hmac_sha256, rfc4231_case1) {
   static const uint8_t key[RFC4231_CASE1_KEY_LEN] = {
       0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b,
-      0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b};
+      0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b,
+  };
   static const uint8_t message[] = "Hi There";
   uint8_t mac[PAMBLE_SHA256_DIGEST_LENGTH];
 
@@ -90,7 +94,8 @@ Test(pamble_hmac_sha256, rfc4231_case4) {
   static const uint8_t key[RFC4231_CASE4_KEY_LEN] = {
       0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09,
       0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10, 0x11, 0x12,
-      0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19};
+      0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19,
+  };
   uint8_t message[RFC4231_CASE4_MSG_LEN];
 
   memset(message, BYTE_FILL_CD, sizeof(message));
