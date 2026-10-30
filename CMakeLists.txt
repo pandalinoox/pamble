@@ -24,6 +24,7 @@ add_executable(pamble
     src/pamble_hmac_sha256.c
     src/pamble_pbkdf2.c
     src/pamble_archive.c
+    src/pamble_aes.c
 )
 
 target_include_directories(pamble
@@ -46,10 +47,12 @@ add_executable(pamble_tests
     tests/test_pamble_hmac_sha256.c
     tests/test_pamble_pdkdf2.c
     tests/test_pamble_archive.c
+    tests/test_pamble_aes.c
     src/pamble_sha256.c
     src/pamble_hmac_sha256.c
     src/pamble_pbkdf2.c
     src/pamble_archive.c
+    src/pamble_aes.c
 )
 
 target_include_directories(pamble_tests
