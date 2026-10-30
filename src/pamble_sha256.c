@@ -2,9 +2,6 @@
 
 #include <string.h>
 
-/*
- * constants
- */
 #define BITS_PER_BYTE 8
 
 #define BYTES_PER_BLOCK 64
