@@ -19,7 +19,7 @@ The implementation uses `pamble_sha256` for every hashing step and works entirel
 
 The common Pamble status interface is documented separately in [`pamble_status.md`](pamble_status.md).
 
-The HMAC-SHA256 API uses `pamble_status` for success and error reporting on its single public function. This includes argument validation and propagation of failures from the underlying `pamble_sha256` calls.
+The HMAC-SHA256 API uses `pamble_status` for success and error reporting on its public functions. This includes argument validation and propagation of failures from the underlying `pamble_sha256` calls.
 
 See [`pamble_status.md`](pamble_status.md) for:
 
@@ -29,6 +29,53 @@ See [`pamble_status.md`](pamble_status.md) for:
 - General status-handling conventions used throughout Pamble.
 
 ## API
+
+### `pamble_hmac_sha256_init`
+
+Initializes an HMAC-SHA256 context using the supplied key.
+
+```c
+pamble_status pamble_hmac_sha256_init(
+    pamble_hmac_sha256_ctx *ctx,
+    const uint8_t *key,
+    size_t key_length
+);
+```
+
+The function normalizes the key, derives the inner and outer keys, and
+initializes the corresponding SHA-256 contexts.
+
+### `pamble_hmac_sha256_update`
+
+Adds message data to an existing HMAC-SHA256 computation.
+
+```c
+pamble_status pamble_hmac_sha256_update(
+    pamble_hmac_sha256_ctx *ctx,
+    const uint8_t *message,
+    size_t message_length
+);
+```
+
+The update operation adds the supplied message data to the inner SHA-256
+computation. The message may be supplied over multiple calls.
+
+`message` may be `NULL` when `message_length` is zero. A `NULL` message with a
+non-zero length returns `PAMBLE_INVALID_ARGUMENT`.
+
+### `pamble_hmac_sha256_final`
+
+Finalizes an HMAC-SHA256 computation and writes the digest.
+
+```c
+pamble_status pamble_hmac_sha256_final(
+    pamble_hmac_sha256_ctx *ctx,
+    uint8_t output_buffer[PAMBLE_SHA256_DIGEST_LENGTH]
+);
+```
+
+Finalization computes the inner digest, adds it to the outer SHA-256
+computation, and writes the resulting HMAC to `output_buffer`.
 
 ### `pamble_hmac_sha256`
 
@@ -56,7 +103,19 @@ The function:
 
 `message` may be `NULL` when `message_length` is zero. A `NULL` message with a non-zero length returns `PAMBLE_INVALID_ARGUMENT`.
 
-Because the entire message is provided up front, there is no streaming interface; the underlying SHA-256 computations are each performed as one-shot calls to `pamble_sha256`.
+The one-shot function performs the same initialization, update, and finalization steps using the complete message provided in a single call.
+
+## Streaming Usage
+
+The streaming interface can be used when the complete message is not
+available at once:
+
+```text
+init → update → update → ... → final
+```
+
+The context must be initialized before updating it, and finalization is
+performed after all message data has been supplied.
 
 ## Internal Design
 
@@ -81,27 +140,21 @@ outer_key[i] = normalized_key[i] XOR OPAD
 
 where `IPAD` is `0x36` and `OPAD` is `0x5c`, applied across all 64 bytes.
 
-### Concatenation
-
-The implementation's `array_concat` function builds the two hash inputs required by HMAC:
-
-- The inner hash input: the 64-byte inner key followed by the message.
-- The outer hash input: the 64-byte outer key followed by the 32-byte inner hash.
-
-Empty arrays are skipped rather than passed to `memcpy`, since `message` may be `NULL` when `message_length` is zero and `memcpy` with a `NULL` pointer is undefined behavior even when the length is zero.
-
-Both concatenations are built into stack buffers sized to the exact combined length before being passed to `pamble_sha256`.
-
 ### Inner and Outer Hashing
 
-The implementation computes:
+The implementation initializes the inner SHA-256 context with the inner key
+and the outer SHA-256 context with the outer key.
+
+Message data supplied through `pamble_hmac_sha256_update` is added to the
+inner context. During finalization, the implementation computes:
 
 ```text
 inner_hash = SHA256(inner_key || message)
 outer_hash = SHA256(outer_key || inner_hash)
 ```
 
-`outer_hash` is the HMAC-SHA256 result and is copied into the caller's `output_buffer`.
+`outer_hash` is the HMAC-SHA256 result and is written to the caller's
+`output_buffer`.
 
 ## Error Handling
 
@@ -109,39 +162,42 @@ Error reporting for the HMAC-SHA256 API is provided by Pamble's common status in
 
 See [`pamble_status.md`](pamble_status.md) for the complete list of status codes, their meanings, and the `PAMBLE_RETURN_IF_ERROR` propagation convention.
 
-`pamble_hmac_sha256` validates its own `key` and `message` arguments directly and propagates any failure from the internal `pamble_sha256` calls — used both for oversized-key normalization and for the inner and outer hash computations — using `PAMBLE_RETURN_IF_ERROR`. Internal helper functions (`normalize_key` aside, since it calls `pamble_sha256`) have no fallible preconditions given how they are invoked, so `key_xor` and `array_concat` return `void` rather than `pamble_status`.
+`pamble_hmac_sha256_init` validates the context and key arguments, while `pamble_hmac_sha256_update` validates the context and message arguments. The update and finalization functions propagate failures from the underlying `pamble_sha256` calls. The `normalize_key` helper also propagates a failure when hashing an oversized key.
 
 ## Usage
 
 ```text
-pamble_hmac_sha256(key, key_length, message, message_length, mac)
+pamble_hmac_sha256_init(ctx, key, key_length)
+pamble_hmac_sha256_update(ctx, message, message_length)
+pamble_hmac_sha256_final(ctx, mac)
 ```
 
-internally performs key normalization, inner/outer key derivation, and the two nested SHA-256 computations, writing the resulting 32-byte MAC to `mac`.
-
-Because the interface is one-shot, the complete key and message must be available at the time of the call.
+The message may be supplied over multiple calls to `pamble_hmac_sha256_update`. The one-shot `pamble_hmac_sha256` function performs these steps when the complete message is available at the time of the call.
 
 ## Implementation Structure
 
 The implementation is organized around the HMAC construction's stages:
 
 ```text
-pamble_hmac_sha256
+pamble_hmac_sha256_init
         │
         ├── normalize_key
         │       └── pamble_sha256 (only if key_length > 64)
         │
-        ├── key_xor(IPAD) → inner_key
-        ├── key_xor(OPAD) → outer_key
-        │
-        ├── array_concat(inner_key, message) → inner_hash_input
-        ├── pamble_sha256(inner_hash_input) → inner_hash
-        │
-        ├── array_concat(outer_key, inner_hash) → outer_hash_input
-        └── pamble_sha256(outer_hash_input) → outer_hash → output_buffer
+        ├── key_xor(IPAD) → inner_key → inner SHA-256 context
+        └── key_xor(OPAD) → outer_key → outer SHA-256 context
+
+pamble_hmac_sha256_update
+        └── pamble_sha256_update(inner context, message)
+
+pamble_hmac_sha256_final
+        ├── pamble_sha256_final(inner context) → inner_hash
+        ├── pamble_sha256_update(outer context, inner_hash)
+        └── pamble_sha256_final(outer context) → output_buffer
 ```
 
-This keeps the HMAC-specific key handling and concatenation logic separate from the SHA-256 hashing itself, which is reused unmodified from `pamble_sha256`.
+This keeps the HMAC-specific key handling separate from the SHA-256 hashing
+itself, which is reused unmodified from `pamble_sha256`.
 
 ## Important Constants
 
@@ -168,7 +224,7 @@ The output buffer supplied to `pamble_hmac_sha256` therefore needs space for `PA
 ## Design Notes
 
 - The implementation reuses `pamble_sha256` unmodified for all hashing; it contains no SHA-256 compression logic of its own.
-- Key normalization, key derivation, and concatenation are each isolated in small internal helper functions.
-- The interface is one-shot only; no streaming context is exposed for HMAC computation.
-- `pamble_status` provides the common success and error-reporting mechanism, propagated from both argument validation and the underlying `pamble_sha256` calls via `PAMBLE_RETURN_IF_ERROR`.
-- The implementation uses fixed-size and variable-length stack buffers sized exactly to the block and message lengths involved, avoiding heap allocation.
+- Key normalization and key derivation are isolated in small internal helper functions.
+- The interface provides both streaming and one-shot HMAC computation.
+- `pamble_status` provides the common success and error-reporting mechanism for argument validation and the underlying `pamble_sha256` calls.
+- The implementation uses fixed-size stack buffers for key normalization, key derivation, and the intermediate digest, avoiding heap allocation.

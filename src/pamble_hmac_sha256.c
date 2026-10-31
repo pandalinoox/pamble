@@ -1,7 +1,5 @@
 #include "pamble/pamble_hmac_sha256.h"
 
-#include <stddef.h>
-#include <stdint.h>
 #include <string.h>
 
 #define BYTES_PER_BLOCK 64
@@ -73,27 +71,107 @@ static void key_xor(const uint8_t normalized_key[static BYTES_PER_BLOCK],
 }
 
 /*
- * @brief Concatenates two byte arrays into a single output buffer.
+ * @brief Initializes an HMAC-SHA256 context.
  *
- * Either array may be NULL when its length is zero; empty arrays are skipped
- * so memcpy is never called with a NULL pointer.
+ * Normalizes the supplied key, derives the inner and outer keys, and
+ * initializes the corresponding SHA-256 contexts.
  *
- * @param arr1 First array.
- * @param arr1_length Number of bytes in arr1.
- * @param arr2 Second array.
- * @param arr2_length Number of bytes in arr2.
- * @param output_buffer Output buffer for the concatenated result, sized
- *                      arr1_length + arr2_length.
+ * @param ctx HMAC-SHA256 context to initialize.
+ * @param key Key data.
+ * @param key_length Number of bytes in key.
+ *
+ * @return PAMBLE_OK if the context was initialized successfully.
+ * @return PAMBLE_INVALID_ARGUMENT if ctx is NULL, or if key is NULL while
+ *         key_length is non-zero.
  */
-static void array_concat(const uint8_t *arr1, size_t arr1_length,
-                         const uint8_t *arr2, size_t arr2_length,
-                         uint8_t output_buffer[arr1_length + arr2_length]) {
-  if (arr1_length != 0) {
-    memcpy(output_buffer, arr1, arr1_length);
+pamble_status pamble_hmac_sha256_init(pamble_hmac_sha256_ctx *ctx,
+                                      const uint8_t *key, size_t key_length) {
+
+  if (ctx == NULL) {
+    return PAMBLE_INVALID_ARGUMENT;
   }
-  if (arr2_length != 0) {
-    memcpy(output_buffer + arr1_length, arr2, arr2_length);
+
+  pamble_status status;
+
+  uint8_t normalized_key[BYTES_PER_BLOCK];
+
+  status = normalize_key(key, key_length, normalized_key);
+  PAMBLE_RETURN_IF_ERROR(status);
+
+  pamble_sha256_init(&ctx->inner);
+  uint8_t inner_key[BYTES_PER_BLOCK];
+  key_xor(normalized_key, IPAD, inner_key);
+  pamble_sha256_update(&ctx->inner, inner_key, BYTES_PER_BLOCK);
+
+  pamble_sha256_init(&ctx->outer);
+  uint8_t outer_key[BYTES_PER_BLOCK];
+  key_xor(normalized_key, OPAD, outer_key);
+  pamble_sha256_update(&ctx->outer, outer_key, BYTES_PER_BLOCK);
+
+  return PAMBLE_OK;
+}
+
+/*
+ * @brief Updates an HMAC-SHA256 context with message data.
+ *
+ * Adds the supplied message data to the inner SHA-256 computation.
+ *
+ * @param ctx HMAC-SHA256 context to update.
+ * @param message Message data to authenticate.
+ * @param message_length Number of bytes in message.
+ *
+ * @return PAMBLE_OK if the context was updated successfully.
+ * @return PAMBLE_INVALID_ARGUMENT if ctx is NULL, or if message is NULL
+ *         while message_length is non-zero.
+ */
+pamble_status pamble_hmac_sha256_update(pamble_hmac_sha256_ctx *ctx,
+                                        const uint8_t *message,
+                                        size_t message_length) {
+  if (ctx == NULL) {
+    return PAMBLE_INVALID_ARGUMENT;
   }
+
+  if (message == NULL && message_length != 0) {
+    return PAMBLE_INVALID_ARGUMENT;
+  }
+
+  return pamble_sha256_update(&ctx->inner, message, message_length);
+}
+
+/*
+ * @brief Finalizes an HMAC-SHA256 computation and produces the digest.
+ *
+ * Finalizes the inner SHA-256 computation, adds the resulting digest to the
+ * outer SHA-256 computation, and writes the resulting HMAC to output_buffer.
+ *
+ * @param ctx HMAC-SHA256 context containing the message state.
+ * @param output_buffer Output buffer for the 32-byte HMAC digest.
+ *
+ * @return PAMBLE_OK if finalization completed successfully.
+ * @return PAMBLE_INVALID_ARGUMENT if ctx is NULL, or if the underlying
+ *         SHA-256 finalization fails.
+ */
+pamble_status pamble_hmac_sha256_final(
+    pamble_hmac_sha256_ctx *ctx,
+    uint8_t output_buffer[static PAMBLE_SHA256_DIGEST_LENGTH]) {
+
+  if (ctx == NULL) {
+    return PAMBLE_INVALID_ARGUMENT;
+  }
+
+  pamble_status status;
+
+  uint8_t inner_hash[PAMBLE_SHA256_DIGEST_LENGTH];
+  status = pamble_sha256_final(&ctx->inner, inner_hash);
+  PAMBLE_RETURN_IF_ERROR(status);
+  status = pamble_sha256_update(&ctx->outer, inner_hash,
+                                PAMBLE_SHA256_DIGEST_LENGTH);
+
+  PAMBLE_RETURN_IF_ERROR(status);
+  status = pamble_sha256_final(&ctx->outer, output_buffer);
+  PAMBLE_RETURN_IF_ERROR(status);
+
+  return PAMBLE_OK;
 }
 
 /*
@@ -128,40 +206,16 @@ pamble_hmac_sha256(const uint8_t *key, size_t key_length,
 
   pamble_status status;
 
-  uint8_t normalized_key[BYTES_PER_BLOCK];
+  pamble_hmac_sha256_ctx ctx;
 
-  status = normalize_key(key, key_length, normalized_key);
+  status = pamble_hmac_sha256_init(&ctx, key, key_length);
   PAMBLE_RETURN_IF_ERROR(status);
 
-  uint8_t inner_key[BYTES_PER_BLOCK];
-  uint8_t outer_key[BYTES_PER_BLOCK];
-
-  key_xor(normalized_key, IPAD, inner_key);
-
-  key_xor(normalized_key, OPAD, outer_key);
-
-  size_t inner_hash_input_size = BYTES_PER_BLOCK + message_length;
-  size_t outer_hash_input_size = BYTES_PER_BLOCK + PAMBLE_SHA256_DIGEST_LENGTH;
-
-  uint8_t inner_hash_input[inner_hash_input_size];
-  uint8_t outer_hash_input[outer_hash_input_size];
-
-  uint8_t inner_hash[PAMBLE_SHA256_DIGEST_LENGTH];
-  uint8_t outer_hash[PAMBLE_SHA256_DIGEST_LENGTH];
-
-  array_concat(inner_key, BYTES_PER_BLOCK, message, message_length,
-               inner_hash_input);
-
-  status = pamble_sha256(inner_hash_input, inner_hash_input_size, inner_hash);
+  status = pamble_hmac_sha256_update(&ctx, message, message_length);
   PAMBLE_RETURN_IF_ERROR(status);
 
-  array_concat(outer_key, BYTES_PER_BLOCK, inner_hash,
-               PAMBLE_SHA256_DIGEST_LENGTH, outer_hash_input);
-
-  status = pamble_sha256(outer_hash_input, outer_hash_input_size, outer_hash);
+  status = pamble_hmac_sha256_final(&ctx, output_buffer);
   PAMBLE_RETURN_IF_ERROR(status);
-
-  memcpy(output_buffer, outer_hash, PAMBLE_SHA256_DIGEST_LENGTH);
 
   return PAMBLE_OK;
 }

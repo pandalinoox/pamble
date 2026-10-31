@@ -4,12 +4,12 @@
 
 #define BITS_PER_BYTE 8
 
-#define BYTES_PER_BLOCK 64
+#define BYTES_PER_BLOCK PAMBLE_SHA256_BYTES_PER_BLOCK
 #define BYTES_PER_LENGTH_FIELD (sizeof(uint64_t))
 
 #define PADDING_BYTE 0x80
 
-#define H_VALUES_SIZE 8
+#define H_VALUES_SIZE PAMBLE_SHA256_H_VALUES_SIZE
 #define K_VALUES_SIZE 64
 
 #define BYTES_PER_WORD (sizeof(uint32_t))
@@ -41,13 +41,6 @@
 #define COMPRESSION_SIGMA0_ROT3 22
 
 enum { WV_A = 0, WV_B, WV_C, WV_D, WV_E, WV_F, WV_G, WV_H };
-
-struct pamble_sha256_ctx {
-  uint32_t hash_state[H_VALUES_SIZE];
-  uint8_t buffer[BYTES_PER_BLOCK];
-  size_t buffer_length;
-  uint64_t message_length;
-};
 
 static const uint32_t H_VALUES[H_VALUES_SIZE] = {
     0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,

@@ -128,7 +128,7 @@ The context contains:
 - `buffer_length` — number of bytes currently stored in the buffer.
 - `message_length` — total message length in bytes.
 
-The implementation keeps the context opaque to callers through the public API.
+The context is defined in the public header so that callers can allocate it directly.
 
 ### Initial Hash Values
 

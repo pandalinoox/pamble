@@ -6,8 +6,21 @@
 #include <stdint.h>
 
 #define PAMBLE_SHA256_DIGEST_LENGTH 32
+#define PAMBLE_SHA256_BYTES_PER_BLOCK 64
+#define PAMBLE_SHA256_H_VALUES_SIZE 8
 
-typedef struct pamble_sha256_ctx pamble_sha256_ctx;
+/**
+ * @brief SHA256 context structure.
+ *
+ * This structure is used to store the state of a SHA256 computation.
+ * It should be initialized using `pamble_sha256_init()` before use.
+ */
+typedef struct {
+  uint32_t hash_state[PAMBLE_SHA256_H_VALUES_SIZE];
+  uint8_t buffer[PAMBLE_SHA256_BYTES_PER_BLOCK];
+  size_t buffer_length;
+  uint64_t message_length;
+} pamble_sha256_ctx;
 
 /*
  * @brief Initializes a SHA-256 context.
