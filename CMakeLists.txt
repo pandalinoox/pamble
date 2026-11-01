@@ -25,6 +25,7 @@ add_executable(pamble
     src/pamble_pbkdf2.c
     src/pamble_archive.c
     src/pamble_aes.c
+    src/pamble_aes_ctr.c
 )
 
 target_include_directories(pamble
@@ -35,6 +36,7 @@ target_include_directories(pamble
 target_compile_definitions(pamble
     PRIVATE
         _POSIX_C_SOURCE=200809L
+        _GNU_SOURCE
 )
 
 enable_testing()
@@ -48,11 +50,13 @@ add_executable(pamble_tests
     tests/test_pamble_pdkdf2.c
     tests/test_pamble_archive.c
     tests/test_pamble_aes.c
+    tests/test_pamble_aes_ctr.c
     src/pamble_sha256.c
     src/pamble_hmac_sha256.c
     src/pamble_pbkdf2.c
     src/pamble_archive.c
     src/pamble_aes.c
+    src/pamble_aes_ctr.c
 )
 
 target_include_directories(pamble_tests
@@ -65,6 +69,7 @@ target_compile_definitions(pamble_tests
     PRIVATE
         _POSIX_C_SOURCE=200809L
         _XOPEN_SOURCE=700
+        _GNU_SOURCE
 )
 
 target_link_directories(pamble_tests

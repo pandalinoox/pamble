@@ -11,7 +11,7 @@ The status definition is provided by:
 
 ## `pamble_status`
 
-The current status enum contains five values:
+The current status enum contains six values:
 
 ```c
 typedef enum {
@@ -20,6 +20,7 @@ typedef enum {
   PAMBLE_SIZE_OVERFLOW,
   PAMBLE_IO_ERROR,
   PAMBLE_INVALID_ARCHIVE,
+  PAMBLE_COUNTER_EXHAUSTED,
 } pamble_status;
 ```
 
@@ -67,6 +68,15 @@ Indicates that archive data is malformed or unsafe to extract.
 The archive API returns this for a truncated archive, a bad magic or
 version, an unknown entry type, invalid mode bits, a directory with
 content, an unsafe path, or bytes after the end marker.
+
+### `PAMBLE_COUNTER_EXHAUSTED`
+
+Indicates that a counter-mode operation needs more keystream than its counter
+allows.
+
+The AES-CTR API returns this when a message would use more than 2^32 counter
+blocks under one nonce. Continuing would wrap the counter and reuse keystream,
+so the operation stops instead.
 
 ## Error Propagation
 
