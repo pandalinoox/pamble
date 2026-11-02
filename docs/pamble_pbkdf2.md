@@ -17,7 +17,7 @@ The implementation uses `pamble_hmac_sha256` for every pseudorandom-function app
 
 The common Pamble status interface is documented separately in [`pamble_status.md`](pamble_status.md).
 
-The PBKDF2 API uses `pamble_status` for success and error reporting on its public derivation function. This includes argument validation and propagation of failures from the underlying `pamble_hmac_sha256` calls, as well as allocation failure for the output buffer.
+The PBKDF2 API uses `pamble_status` for success and error reporting on its public derivation function. This includes propagation of failures from the underlying `pamble_hmac_sha256` calls.
 
 See [`pamble_status.md`](pamble_status.md) for:
 
@@ -34,40 +34,25 @@ Derives a key of arbitrary length from a password and salt using PBKDF2-HMAC-SHA
 
 ```c
 pamble_status pamble_pbkdf2(
-    const uint8_t *password,
     size_t password_length,
-    const uint8_t *salt,
+    const uint8_t *password,
     size_t salt_length,
-    uint8_t **derived_key,
-    size_t dk_length
+    const uint8_t *salt,
+    size_t dk_length,
+    uint8_t *derived_key
 );
 ```
 
 The function:
 
 - Computes the number of 32-byte blocks needed to cover `dk_length`, rounding up.
-- Allocates a `dk_length`-byte output buffer for the derived key.
 - Derives each block `T_i` from the password, salt, and block index.
 - Copies each block (truncating the final block if necessary) into the output buffer at the correct offset.
-- Writes the address of the newly allocated buffer to `*derived_key`.
+- Writes the derived key into the caller-supplied `derived_key` buffer.
 
-`password` may be `NULL` when `password_length` is zero. A `NULL` password with a non-zero length returns `PAMBLE_INVALID_ARGUMENT`.
+`derived_key` must point to a buffer of at least `dk_length` bytes, supplied by the caller.
 
-`salt` may be `NULL` when `salt_length` is zero. A `NULL` salt with a non-zero length returns `PAMBLE_INVALID_ARGUMENT`.
-
-`derived_key` must not be `NULL`, and `dk_length` must be non-zero; otherwise the function returns `PAMBLE_INVALID_ARGUMENT`.
-
-Because the interface is one-shot, the complete password and salt must be available at the time of the call, and the entire derived key is produced and returned at once.
-
-### `pamble_free_pbkdf2_dk`
-
-Frees a derived key previously allocated by `pamble_pbkdf2`.
-
-```c
-void pamble_free_pbkdf2_dk(uint8_t *derived_key);
-```
-
-`derived_key` may be `NULL`, in which case the call is a no-op. Callers are responsible for calling this function to release the buffer written to `*derived_key` by a successful `pamble_pbkdf2` call.
+Because the interface is one-shot, the complete password and salt must be available at the time of the call, and the entire derived key is produced and written at once.
 
 ## Internal Design
 
@@ -98,7 +83,7 @@ The implementation's `process_block` function derives a single output block, `T_
 
 ### Output Assembly
 
-`pamble_pbkdf2` allocates a `dk_length`-byte buffer with `calloc`. For each derived block, the implementation's `write_block_output` function copies as many of the block's 32 bytes as remain to be filled — truncating the final block if `dk_length` is not an exact multiple of 32 — into the buffer at the appropriate offset, and returns the number of bytes copied. `pamble_pbkdf2` uses this return value to update a running count of remaining unwritten bytes, which determines how much of the next block to copy.
+For each derived block, the implementation's `write_block_output` function copies as many of the block's 32 bytes as remain to be filled — truncating the final block if `dk_length` is not an exact multiple of 32 — into the caller-supplied `derived_key` buffer at the appropriate offset, and returns the number of bytes copied. `pamble_pbkdf2` uses this return value to update a running count of remaining unwritten bytes, which determines how much of the next block to copy.
 
 ## Error Handling
 
@@ -106,15 +91,15 @@ Error reporting for the PBKDF2 API is provided by Pamble's common status interfa
 
 See [`pamble_status.md`](pamble_status.md) for the complete list of status codes, their meanings, and the `PAMBLE_RETURN_IF_ERROR` propagation convention.
 
-`pamble_pbkdf2` validates its own `password`, `salt`, `derived_key`, and `dk_length` arguments directly. It returns `PAMBLE_SIZE_OVERFLOW` if the requested `dk_length` would require more blocks than fit in a `uint32_t`, or if allocation of the output buffer fails. Failures from the underlying `pamble_hmac_sha256` calls (performed within `process_block` and `process_iteration`) are propagated using `PAMBLE_RETURN_IF_ERROR`; on such failure, the partially filled output buffer is freed via `pamble_free_pbkdf2_dk` and `*derived_key` is set to `NULL` before the error is returned. Internal helper functions (`process_block` and `process_iteration` aside, since they call `pamble_hmac_sha256`) have no fallible preconditions given how they are invoked, so `int32_be`, `array_concat`, and `write_block_output` return `void` or a plain byte count rather than `pamble_status`.
+`pamble_pbkdf2` returns `PAMBLE_SIZE_OVERFLOW` if the requested `dk_length` would require more blocks than fit in a `uint32_t`. Failures from the underlying `pamble_hmac_sha256` calls (performed within `process_block` and `process_iteration`) are propagated using `PAMBLE_RETURN_IF_ERROR`; on such failure, the error is returned and the `derived_key` buffer may be partially filled. Internal helper functions (`process_block` and `process_iteration` aside, since they call `pamble_hmac_sha256`) have no fallible preconditions given how they are invoked, so `int32_be`, `array_concat`, and `write_block_output` return `void` or a plain byte count rather than `pamble_status`.
 
 ## Usage
 
 ```text
-pamble_pbkdf2(password, password_length, salt, salt_length, &derived_key, dk_length)
+pamble_pbkdf2(password_length, password, salt_length, salt, dk_length, derived_key)
 ```
 
-internally performs block-count calculation, output-buffer allocation, and per-block HMAC-SHA256 iteration, writing the resulting `dk_length`-byte derived key to a newly allocated buffer referenced by `derived_key`. The caller must release this buffer with `pamble_free_pbkdf2_dk` once done with it.
+internally performs block-count calculation and per-block HMAC-SHA256 iteration, writing the resulting `dk_length`-byte derived key to the caller-supplied buffer `derived_key`.
 
 Because the interface is one-shot, the complete password and salt must be available at the time of the call.
 
@@ -126,7 +111,6 @@ The implementation is organized around the PBKDF2 construction's stages:
 pamble_pbkdf2
         │
         ├── (compute block count from dk_length)
-        ├── calloc → *derived_key
         │
         └── for each block_no in 1..blocks:
                 │
@@ -141,7 +125,7 @@ pamble_pbkdf2
                                         ├── pamble_hmac_sha256(password, U_{j-1}) → U_j
                                         └── T ^= U_j
                 │
-                write_block_output(T_i) → copy into *derived_key at the block's offset
+                write_block_output(T_i) → copy into derived_key at the block's offset
 ```
 
 This keeps the PBKDF2-specific block indexing, salt concatenation, and iteration/XOR accumulation separate from the HMAC-SHA256 computation itself, which is reused unmodified from `pamble_hmac_sha256`.
@@ -174,5 +158,5 @@ The overall derived key is the concatenation of `ceil(dk_length / 32)` such bloc
 - Block-index encoding, salt concatenation, per-iteration XOR accumulation, and output assembly are each isolated in small internal helper functions.
 - The interface is one-shot only; no streaming context is exposed for PBKDF2 computation, and the entire password and salt must be supplied up front.
 - The iteration count, `PAMBLE_PBKDF2_ITERATIONS`, is fixed at compile time rather than being a caller-supplied parameter.
-- `pamble_status` provides the common success and error-reporting mechanism, propagated from both argument validation and the underlying `pamble_hmac_sha256` calls via `PAMBLE_RETURN_IF_ERROR`.
-- The derived-key buffer is heap-allocated (unlike the fixed-size and variable-length stack buffers used within a single block's derivation) because its size, `dk_length`, is caller-specified and may be arbitrarily large; ownership is transferred to the caller, who must release it with `pamble_free_pbkdf2_dk`.
+- `pamble_status` provides the common success and error-reporting mechanism, propagated from the underlying `pamble_hmac_sha256` calls via `PAMBLE_RETURN_IF_ERROR`.
+- The derived-key buffer is supplied by the caller, since its size, `dk_length`, is caller-specified and may be arbitrarily large; the implementation performs no heap allocation for it.

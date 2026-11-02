@@ -1,3 +1,4 @@
+
 #include "pamble/pamble_hmac_sha256.h"
 
 #include <criterion/criterion.h>
@@ -13,8 +14,6 @@
 #define RFC4231_CASE4_KEY_LEN 32
 #define RFC4231_CASE4_MSG_LEN 50
 #define LARGE_KEY_LEN 131
-#define NULL_KEY_TEST_LEN 20
-#define NULL_MSG_TEST_LEN 3
 #define BYTE_FILL_AA 0xaa
 #define BYTE_FILL_DD 0xdd
 #define BYTE_FILL_CD 0xcd
@@ -50,7 +49,7 @@ Test(pamble_hmac_sha256, rfc4231_case1) {
   uint8_t mac[PAMBLE_SHA256_DIGEST_LENGTH];
 
   pamble_status status =
-      pamble_hmac_sha256(key, sizeof(key), message, sizeof(message) - 1, mac);
+      pamble_hmac_sha256(sizeof(key), key, sizeof(message) - 1, message, mac);
 
   cr_assert_eq(status, PAMBLE_OK);
 
@@ -63,8 +62,8 @@ Test(pamble_hmac_sha256, rfc4231_case2) {
   static const uint8_t message[] = "what do ya want for nothing?";
   uint8_t mac[PAMBLE_SHA256_DIGEST_LENGTH];
 
-  pamble_status status = pamble_hmac_sha256(key, sizeof(key) - 1, message,
-                                            sizeof(message) - 1, mac);
+  pamble_status status = pamble_hmac_sha256(sizeof(key) - 1, key,
+                                            sizeof(message) - 1, message, mac);
 
   cr_assert_eq(status, PAMBLE_OK);
 
@@ -82,7 +81,7 @@ Test(pamble_hmac_sha256, rfc4231_case3) {
   uint8_t mac[PAMBLE_SHA256_DIGEST_LENGTH];
 
   pamble_status status =
-      pamble_hmac_sha256(key, sizeof(key), message, sizeof(message), mac);
+      pamble_hmac_sha256(sizeof(key), key, sizeof(message), message, mac);
 
   cr_assert_eq(status, PAMBLE_OK);
 
@@ -103,7 +102,7 @@ Test(pamble_hmac_sha256, rfc4231_case4) {
   uint8_t mac[PAMBLE_SHA256_DIGEST_LENGTH];
 
   pamble_status status =
-      pamble_hmac_sha256(key, sizeof(key), message, sizeof(message), mac);
+      pamble_hmac_sha256(sizeof(key), key, sizeof(message), message, mac);
 
   cr_assert_eq(status, PAMBLE_OK);
 
@@ -121,7 +120,7 @@ Test(pamble_hmac_sha256, key_longer_than_block_size) {
   uint8_t mac[PAMBLE_SHA256_DIGEST_LENGTH];
 
   pamble_status status =
-      pamble_hmac_sha256(key, sizeof(key), message, sizeof(message) - 1, mac);
+      pamble_hmac_sha256(sizeof(key), key, sizeof(message) - 1, message, mac);
 
   cr_assert_eq(status, PAMBLE_OK);
 
@@ -141,7 +140,7 @@ Test(pamble_hmac_sha256, key_and_message_longer_than_block_size) {
   uint8_t mac[PAMBLE_SHA256_DIGEST_LENGTH];
 
   pamble_status status =
-      pamble_hmac_sha256(key, sizeof(key), message, sizeof(message) - 1, mac);
+      pamble_hmac_sha256(sizeof(key), key, sizeof(message) - 1, message, mac);
 
   cr_assert_eq(status, PAMBLE_OK);
 
@@ -150,9 +149,11 @@ Test(pamble_hmac_sha256, key_and_message_longer_than_block_size) {
 }
 
 Test(pamble_hmac_sha256, empty_key_and_message) {
+  static const uint8_t key[] = "";
+  static const uint8_t message[] = "";
   uint8_t mac[PAMBLE_SHA256_DIGEST_LENGTH];
 
-  pamble_status status = pamble_hmac_sha256(NULL, 0, NULL, 0, mac);
+  pamble_status status = pamble_hmac_sha256(0, key, 0, message, mac);
 
   cr_assert_eq(status, PAMBLE_OK);
 
@@ -160,31 +161,13 @@ Test(pamble_hmac_sha256, empty_key_and_message) {
       mac, "b613679a0814d9ec772f95d778c35fc5ff1697c493715653c6c712144292c5ad");
 }
 
-Test(pamble_hmac_sha256, null_key_with_nonzero_length) {
-  static const uint8_t message[] = "abc";
-  uint8_t mac[PAMBLE_SHA256_DIGEST_LENGTH];
-
-  pamble_status status = pamble_hmac_sha256(NULL, NULL_KEY_TEST_LEN, message,
-                                            sizeof(message) - 1, mac);
-
-  cr_assert_eq(status, PAMBLE_INVALID_ARGUMENT);
-}
-
-Test(pamble_hmac_sha256, null_message_with_nonzero_length) {
+Test(pamble_hmac_sha256, empty_message) {
   static const uint8_t key[] = "key";
+  static const uint8_t message[] = "";
   uint8_t mac[PAMBLE_SHA256_DIGEST_LENGTH];
 
   pamble_status status =
-      pamble_hmac_sha256(key, sizeof(key) - 1, NULL, NULL_MSG_TEST_LEN, mac);
-
-  cr_assert_eq(status, PAMBLE_INVALID_ARGUMENT);
-}
-
-Test(pamble_hmac_sha256, null_message_with_zero_length) {
-  static const uint8_t key[] = "key";
-  uint8_t mac[PAMBLE_SHA256_DIGEST_LENGTH];
-
-  pamble_status status = pamble_hmac_sha256(key, sizeof(key) - 1, NULL, 0, mac);
+      pamble_hmac_sha256(sizeof(key) - 1, key, 0, message, mac);
 
   cr_assert_eq(status, PAMBLE_OK);
 

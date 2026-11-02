@@ -103,8 +103,8 @@ Provides the one-shot SHA-256 interface.
 
 ```c
 pamble_status pamble_sha256(
-    const uint8_t *message,
     size_t message_length,
+    const uint8_t *message,
     uint8_t output_buffer[PAMBLE_SHA256_DIGEST_LENGTH]
 );
 ```
@@ -285,7 +285,7 @@ The result is independent of how the message is divided between `update` calls. 
 When the complete message is already available:
 
 ```text
-pamble_sha256(message, message_length, digest)
+pamble_sha256(message_length, message, digest)
 ```
 
 internally performs initialization, update, and finalization.

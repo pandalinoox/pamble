@@ -61,8 +61,8 @@ process_iteration(const uint8_t *password, size_t password_length,
                   uint8_t t_hash[PAMBLE_SHA256_DIGEST_LENGTH]) {
   pamble_status status;
 
-  status = pamble_hmac_sha256(password, password_length, u_hash,
-                              PAMBLE_SHA256_DIGEST_LENGTH, u_hash);
+  status = pamble_hmac_sha256(password_length, password,
+                              PAMBLE_SHA256_DIGEST_LENGTH, u_hash, u_hash);
 
   PAMBLE_RETURN_IF_ERROR(status);
 
@@ -101,8 +101,9 @@ process_block(const uint8_t *password, size_t password_length,
 
   uint8_t u_hash[PAMBLE_SHA256_DIGEST_LENGTH];
 
-  status = pamble_hmac_sha256(password, password_length, salt_concat_int32_be,
-                              salt_length + BYTES_PER_32_BITS, u_hash);
+  status = pamble_hmac_sha256(password_length, password,
+                              salt_length + BYTES_PER_32_BITS,
+                              salt_concat_int32_be, u_hash);
 
   PAMBLE_RETURN_IF_ERROR(status);
 
@@ -144,63 +145,37 @@ write_block_output(const uint8_t t_hash[PAMBLE_SHA256_DIGEST_LENGTH],
 }
 
 /*
- * @brief Frees a derived key previously allocated by pamble_pbkdf2.
- *
- * @param derived_key Derived key buffer to free. NULL is a no-op.
- */
-void pamble_free_pbkdf2_dk(uint8_t *derived_key) { free(derived_key); }
-
-/*
  * @brief Derives a key from a password and salt using PBKDF2-HMAC-SHA256.
  *
  * This is the one-shot PBKDF2 interface. It derives each 32-byte output
  * block via repeated HMAC-SHA256 applications and concatenates them,
  * truncating the last block as needed, to fill dk_length bytes.
  *
- * @param password Password data used as the HMAC key.
  * @param password_length Number of bytes in password.
- * @param salt Salt data.
+ * @param password Password data used as the HMAC key.
  * @param salt_length Number of bytes in salt.
- * @param derived_key Output parameter; on success, set to a newly
- *                     allocated dk_length-byte buffer. Caller must free
- *                     it with pamble_free_pbkdf2_dk.
+ * @param salt Salt data.
  * @param dk_length Desired length, in bytes, of the derived key.
- *                   Must be non-zero.
+ * @param derived_key Output buffer for the derived key, sized dk_length.
  *
  * @return PAMBLE_OK if the key was derived successfully.
- * @return PAMBLE_INVALID_ARGUMENT if password is NULL while
- *         password_length is non-zero, if salt is NULL while salt_length
- *         is non-zero, or if derived_key is NULL or dk_length is zero.
  * @return PAMBLE_SIZE_OVERFLOW if dk_length requires more than
- *         UINT32_MAX blocks, or if allocation fails.
+ *         UINT32_MAX blocks.
  * @return Any error propagated from the underlying pamble_hmac_sha256
  *         calls.
  */
-pamble_status pamble_pbkdf2(const uint8_t *password, size_t password_length,
-                            const uint8_t *salt, size_t salt_length,
-                            uint8_t **derived_key, size_t dk_length) {
-  if (password == NULL && password_length != 0) {
-    return PAMBLE_INVALID_ARGUMENT;
-  }
 
-  if (salt == NULL && salt_length != 0) {
-    return PAMBLE_INVALID_ARGUMENT;
-  }
-
-  if (derived_key == NULL || dk_length == 0) {
-    return PAMBLE_INVALID_ARGUMENT;
-  }
+pamble_status pamble_pbkdf2(size_t password_length,
+                            const uint8_t password[static password_length],
+                            size_t salt_length,
+                            const uint8_t salt[static salt_length],
+                            size_t dk_length,
+                            uint8_t derived_key[static dk_length]) {
 
   size_t blocks = (dk_length / PAMBLE_SHA256_DIGEST_LENGTH) +
                   (dk_length % PAMBLE_SHA256_DIGEST_LENGTH != 0);
 
   if (blocks > UINT32_MAX) {
-    return PAMBLE_SIZE_OVERFLOW;
-  }
-
-  *derived_key = calloc(dk_length, sizeof(uint8_t));
-
-  if (*derived_key == NULL) {
     return PAMBLE_SIZE_OVERFLOW;
   }
 
@@ -213,13 +188,11 @@ pamble_status pamble_pbkdf2(const uint8_t *password, size_t password_length,
                                          salt_length, block_no, t_hash);
 
     if (status != PAMBLE_OK) {
-      pamble_free_pbkdf2_dk(*derived_key);
-      *derived_key = NULL;
       return status;
     }
 
     size_t to_copy =
-        write_block_output(t_hash, block_no, derived_key_free, *derived_key);
+        write_block_output(t_hash, block_no, derived_key_free, derived_key);
 
     derived_key_free -= to_copy;
   }

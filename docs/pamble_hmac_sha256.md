@@ -83,10 +83,10 @@ Computes the HMAC-SHA256 of a message under a given key.
 
 ```c
 pamble_status pamble_hmac_sha256(
-    const uint8_t *key,
     size_t key_length,
-    const uint8_t *message,
+    const uint8_t *key,
     size_t message_length,
+    const uint8_t *message,
     uint8_t output_buffer[PAMBLE_SHA256_DIGEST_LENGTH]
 );
 ```
@@ -98,10 +98,6 @@ The function:
 - Computes the inner hash over the inner key and message.
 - Computes the outer hash over the outer key and inner hash.
 - Writes the outer hash to `output_buffer` as the HMAC.
-
-`key` may be `NULL` when `key_length` is zero. A `NULL` key with a non-zero length returns `PAMBLE_INVALID_ARGUMENT`.
-
-`message` may be `NULL` when `message_length` is zero. A `NULL` message with a non-zero length returns `PAMBLE_INVALID_ARGUMENT`.
 
 The one-shot function performs the same initialization, update, and finalization steps using the complete message provided in a single call.
 

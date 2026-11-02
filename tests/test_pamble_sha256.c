@@ -1,3 +1,4 @@
+
 #include "pamble/pamble_sha256.h"
 
 #include <criterion/criterion.h>
@@ -26,9 +27,10 @@ static void assert_digest(const uint8_t actual[PAMBLE_SHA256_DIGEST_LENGTH],
 }
 
 Test(pamble_sha256, empty_message) {
+  static const uint8_t message[] = "";
   uint8_t digest[PAMBLE_SHA256_DIGEST_LENGTH];
 
-  pamble_status status = pamble_sha256(NULL, 0, digest);
+  pamble_status status = pamble_sha256(0, message, digest);
 
   cr_assert_eq(status, PAMBLE_OK);
 
@@ -41,7 +43,7 @@ Test(pamble_sha256, single_byte) {
   static const uint8_t message[] = "a";
   uint8_t digest[PAMBLE_SHA256_DIGEST_LENGTH];
 
-  pamble_status status = pamble_sha256(message, sizeof(message) - 1, digest);
+  pamble_status status = pamble_sha256(sizeof(message) - 1, message, digest);
 
   cr_assert_eq(status, PAMBLE_OK);
 
@@ -53,7 +55,7 @@ Test(pamble_sha256, abc) {
   static const uint8_t message[] = "abc";
   uint8_t digest[PAMBLE_SHA256_DIGEST_LENGTH];
 
-  pamble_status status = pamble_sha256(message, sizeof(message) - 1, digest);
+  pamble_status status = pamble_sha256(sizeof(message) - 1, message, digest);
 
   cr_assert_eq(status, PAMBLE_OK);
 
@@ -68,31 +70,11 @@ Test(pamble_sha256, standard_test_vector) {
 
   uint8_t digest[PAMBLE_SHA256_DIGEST_LENGTH];
 
-  pamble_status status = pamble_sha256(message, sizeof(message) - 1, digest);
+  pamble_status status = pamble_sha256(sizeof(message) - 1, message, digest);
 
   cr_assert_eq(status, PAMBLE_OK);
 
   assert_digest(
       digest,
       "248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1");
-}
-
-Test(pamble_sha256, null_message_with_nonzero_length) {
-  uint8_t digest[PAMBLE_SHA256_DIGEST_LENGTH];
-
-  pamble_status status = pamble_sha256(NULL, 3, digest);
-
-  cr_assert_eq(status, PAMBLE_INVALID_ARGUMENT);
-}
-
-Test(pamble_sha256, null_message_with_zero_length) {
-  uint8_t digest[PAMBLE_SHA256_DIGEST_LENGTH];
-
-  pamble_status status = pamble_sha256(NULL, 0, digest);
-
-  cr_assert_eq(status, PAMBLE_OK);
-
-  assert_digest(
-      digest,
-      "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
 }

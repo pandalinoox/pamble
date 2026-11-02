@@ -82,16 +82,15 @@ pamble_sha256_final(const pamble_sha256_ctx *ctx,
  * the complete message, finalizes the computation, and writes the resulting
  * digest to output_buffer.
  *
- * @param message Message data to hash.
  * @param message_length Number of bytes in message.
+ * @param message Message data to hash.
  * @param output_buffer Output buffer for the 32-byte digest.
  *
  * @return PAMBLE_OK if the digest was computed successfully.
- * @return PAMBLE_INVALID_ARGUMENT if output_buffer is NULL, or if
- *         message is NULL while message_length is non-zero.
  * @return PAMBLE_SIZE_OVERFLOW if the message length exceeds the
  *         maximum length representable by SHA-256.
  */
 pamble_status
-pamble_sha256(const uint8_t *message, size_t message_length,
+pamble_sha256(size_t message_length,
+              const uint8_t message[static message_length],
               uint8_t output_buffer[static PAMBLE_SHA256_DIGEST_LENGTH]);
