@@ -145,32 +145,29 @@ pamble_status pamble_aes_ctr_cleanup(pamble_aes_ctr_ctx *ctx);
 /*
  * @brief Encrypts or decrypts a whole message in one call.
  *
- * One-shot interface: initializes ctx, processes the message and wipes ctx
- * again. ctx is only scratch space supplied by the caller, so no state is
- * kept after a successful call. Encryption and decryption are the same
- * operation.
+ * One-shot interface: initializes a context, processes the message and wipes
+ * the context again. No state is kept after the call. Encryption and
+ * decryption are the same operation.
  *
- * ctx is wiped on every path that gets past argument validation, including
- * when processing fails, so no key material is left behind on error. When
- * the arguments are rejected, ctx is not touched.
+ * The context is wiped even when processing fails, so no key material is left
+ * behind on error. When the arguments are rejected, the context is not
+ * initialized.
  *
- * @param ctx Scratch context used for the operation.
  * @param key 32-byte AES-256 key.
- * @param initial_counter Counter block used for the first keystream block.
+ * @param nonce 12-byte nonce used for the first counter block.
  * @param input_message Data to process.
  * @param input_message_length Number of bytes in input_message.
  * @param output_buffer Output for input_message_length bytes; may be the same
  *        buffer as input_message.
  *
  * @return PAMBLE_OK if the message was processed successfully.
- * @return PAMBLE_INVALID_ARGUMENT if ctx is NULL, or if input_message is NULL
- *         while input_message_length is non-zero.
+ * @return PAMBLE_INVALID_ARGUMENT if input_message is NULL while
+ *         input_message_length is non-zero.
  * @return PAMBLE_COUNTER_EXHAUSTED if the message is longer than the counter
  *         allows (see pamble_aes_ctr_update).
  */
 pamble_status
-pamble_aes_ctr_crypt(pamble_aes_ctr_ctx *ctx,
-                     const uint8_t key[static PAMBLE_AES256_KEY_SIZE],
-                     pamble_aes_ctr_counter_block initial_counter,
+pamble_aes_ctr_crypt(const uint8_t key[static PAMBLE_AES256_KEY_SIZE],
+                     uint8_t nonce[PAMBLE_AES_CTR_NONCE_BYTES],
                      const uint8_t *input_message, size_t input_message_length,
                      uint8_t output_buffer[static input_message_length]);

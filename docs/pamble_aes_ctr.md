@@ -24,7 +24,7 @@ All public functions except `pamble_aes_ctr_flatten_counter_block` return `pambl
 | Status | Returned when |
 | --- | --- |
 | `PAMBLE_OK` | The operation completed. |
-| `PAMBLE_INVALID_ARGUMENT` | `ctx` is `NULL`, or `input_message` is `NULL` while `input_message_length` is non-zero. |
+| `PAMBLE_INVALID_ARGUMENT` | A required context is `NULL`, or `input_message` is `NULL` while `input_message_length` is non-zero. |
 | `PAMBLE_COUNTER_EXHAUSTED` | A message needs more than 2^32 keystream blocks under one nonce. |
 
 Array parameters declared with `[static N]` (the key, the output buffer, the flatten output) must be non-`NULL` and large enough; they are not checked at run time.
@@ -132,17 +132,16 @@ One-shot encrypt or decrypt.
 
 ```c
 pamble_status pamble_aes_ctr_crypt(
-    pamble_aes_ctr_ctx *ctx,
     const uint8_t key[static PAMBLE_AES256_KEY_SIZE],
-    pamble_aes_ctr_counter_block initial_counter,
+    uint8_t nonce[PAMBLE_AES_CTR_NONCE_BYTES],
     const uint8_t *input_message,
     size_t input_message_length,
     uint8_t output_buffer[static input_message_length]);
 ```
 
-Runs init, update and cleanup in order. `ctx` is only scratch space. The name says "encrypt" but decryption is the same call.
+Creates an internal context, runs init, update and cleanup in order, and wipes the context before returning. The name says "encrypt" but decryption is the same call.
 
-`ctx` is wiped on every path that gets past argument validation, including when `update` fails (for example with `PAMBLE_COUNTER_EXHAUSTED`), so no key material is left behind on error. If the arguments are rejected, `ctx` is not touched. The first error encountered is the one returned.
+The context is wiped even when `update` fails (for example with `PAMBLE_COUNTER_EXHAUSTED`), so no key material is left behind on error. If the arguments are rejected, the context is not initialized. The first error encountered is the one returned.
 
 ## Internal Design
 
@@ -174,29 +173,24 @@ The block for `0xFFFFFFFF` is still used in full. Only when another block is nee
 
 ## Error Handling
 
-- `NULL` context and `NULL` input with non-zero length are rejected before any work is done.
+- `NULL` context in the streaming interface and `NULL` input with non-zero length are rejected before any work is done.
 - A failure in the middle of `update` can leave `output_buffer` partly written. Only `PAMBLE_COUNTER_EXHAUSTED` can occur at that point.
-- `pamble_aes_ctr_crypt` wipes `ctx` even when it fails; see above.
+- `pamble_aes_ctr_crypt` wipes its internal context even when it fails; see above.
 
 ## Usage
 
 ### One-shot
 
 ```c
-pamble_aes_ctr_ctx ctx;
-pamble_aes_ctr_counter_block counter = {0};
-
-memcpy(counter.nonce, nonce, PAMBLE_AES_CTR_NONCE_BYTES);
-
 pamble_status status = pamble_aes_ctr_crypt(
-    &ctx, key, counter, plain_text, plain_text_length, cipher_text);
+    key, nonce, plain_text, plain_text_length, cipher_text);
 
 if (status != PAMBLE_OK) {
-  /* handle error; ctx has already been wiped */
+  /* handle error */
 }
 ```
 
-Decrypting is the same call with the same key and counter block, passing the ciphertext as input.
+Decrypting is the same call with the same key and nonce, passing the ciphertext as input.
 
 ### Streaming
 
@@ -250,7 +244,7 @@ pamble_aes_ctr_crypt
 - Chunked updates at every split point and byte-at-a-time updates match the one-shot result.
 - In-place operation, round trip, and different nonces giving different keystreams.
 - Counter layout: flattening, big-endian increments, and the nonce staying unchanged across carries.
-- Context handling: `init` state, `cleanup` zeroing the whole struct, and `encrypt` wiping its scratch context on success and on failure.
+- Context handling: `init` state, `cleanup` zeroing the whole struct, and `encrypt` wiping its internal context on success and on failure.
 - Exhaustion: the last counter value is usable, the counter does not wrap, bytes before the limit are written, the flag is sticky, and the one-shot call reports it.
 - `NULL` arguments and zero-length input.
 

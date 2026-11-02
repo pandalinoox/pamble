@@ -86,6 +86,26 @@ static bool is_all_zero(const void *data, size_t length) {
   return true;
 }
 
+static pamble_status stream_crypt(const uint8_t *key,
+                                  pamble_aes_ctr_counter_block counter,
+                                  const uint8_t *input, size_t length,
+                                  uint8_t *output) {
+  pamble_aes_ctr_ctx ctx;
+
+  pamble_status status = pamble_aes_ctr_init(&ctx, key, counter);
+  if (status != PAMBLE_OK) {
+    return status;
+  }
+
+  status = pamble_aes_ctr_update(&ctx, input, length, output);
+  pamble_status cleanup_status = pamble_aes_ctr_cleanup(&ctx);
+
+  if (status != PAMBLE_OK) {
+    return status;
+  }
+  return cleanup_status;
+}
+
 Test(pamble_aes_ctr, constants_match_aes_block_size) {
   cr_assert_eq(PAMBLE_AES_CTR_NONCE_BYTES, 12);
   cr_assert_eq(PAMBLE_AES_CTR_COUNTER_BYTES, 4);
@@ -101,42 +121,6 @@ Test(pamble_aes_ctr, flatten_counter_block_is_nonce_then_counter) {
 
   assert_bytes_equal_hex(flat, "000102030405060708090a0b0c0d0e0f", sizeof(flat),
                          "flattened counter block is wrong");
-}
-
-Test(pamble_aes_ctr, sp800_38a_f55_encrypt_one_shot) {
-  uint8_t key[PAMBLE_AES256_KEY_SIZE];
-  uint8_t plain_text[SP800_38A_BYTES];
-  uint8_t output[SP800_38A_BYTES];
-  pamble_aes_ctr_ctx ctx;
-
-  hex_to_bytes(SP800_38A_KEY, key, sizeof(key));
-  hex_to_bytes(SP800_38A_PLAIN_TEXT, plain_text, sizeof(plain_text));
-
-  pamble_status status = pamble_aes_ctr_crypt(
-      &ctx, key, make_counter(SP800_38A_NONCE, SP800_38A_COUNTER), plain_text,
-      sizeof(plain_text), output);
-
-  cr_assert_eq(status, PAMBLE_OK);
-  assert_bytes_equal_hex(output, SP800_38A_CIPHER_TEXT, sizeof(output),
-                         "ciphertext does not match SP 800-38A F.5.5");
-}
-
-Test(pamble_aes_ctr, sp800_38a_f55_decrypt_one_shot) {
-  uint8_t key[PAMBLE_AES256_KEY_SIZE];
-  uint8_t cipher_text[SP800_38A_BYTES];
-  uint8_t output[SP800_38A_BYTES];
-  pamble_aes_ctr_ctx ctx;
-
-  hex_to_bytes(SP800_38A_KEY, key, sizeof(key));
-  hex_to_bytes(SP800_38A_CIPHER_TEXT, cipher_text, sizeof(cipher_text));
-
-  pamble_status status = pamble_aes_ctr_crypt(
-      &ctx, key, make_counter(SP800_38A_NONCE, SP800_38A_COUNTER), cipher_text,
-      sizeof(cipher_text), output);
-
-  cr_assert_eq(status, PAMBLE_OK);
-  assert_bytes_equal_hex(output, SP800_38A_PLAIN_TEXT, sizeof(output),
-                         "decryption does not recover the plain text");
 }
 
 Test(pamble_aes_ctr, sp800_38a_f55_streaming_init_update) {
@@ -160,19 +144,35 @@ Test(pamble_aes_ctr, sp800_38a_f55_streaming_init_update) {
                          "streaming ciphertext does not match F.5.5");
 }
 
+Test(pamble_aes_ctr, sp800_38a_f55_streaming_decrypt) {
+  uint8_t key[PAMBLE_AES256_KEY_SIZE];
+  uint8_t cipher_text[SP800_38A_BYTES];
+  uint8_t output[SP800_38A_BYTES];
+
+  hex_to_bytes(SP800_38A_KEY, key, sizeof(key));
+  hex_to_bytes(SP800_38A_CIPHER_TEXT, cipher_text, sizeof(cipher_text));
+
+  cr_assert_eq(stream_crypt(key,
+                            make_counter(SP800_38A_NONCE, SP800_38A_COUNTER),
+                            cipher_text, sizeof(cipher_text), output),
+               PAMBLE_OK);
+
+  assert_bytes_equal_hex(output, SP800_38A_PLAIN_TEXT, sizeof(output),
+                         "decryption does not recover the plain text");
+}
+
 Test(pamble_aes_ctr, partial_final_block_is_a_prefix_of_the_keystream) {
   uint8_t key[PAMBLE_AES256_KEY_SIZE];
   uint8_t plain_text[SP800_38A_BYTES];
   uint8_t output[SP800_38A_BYTES];
-  pamble_aes_ctr_ctx ctx;
   const size_t length = SP800_38A_PARTIAL_LENGTH;
 
   hex_to_bytes(SP800_38A_KEY, key, sizeof(key));
   hex_to_bytes(SP800_38A_PLAIN_TEXT, plain_text, sizeof(plain_text));
 
-  cr_assert_eq(pamble_aes_ctr_crypt(
-                   &ctx, key, make_counter(SP800_38A_NONCE, SP800_38A_COUNTER),
-                   plain_text, length, output),
+  cr_assert_eq(stream_crypt(key,
+                            make_counter(SP800_38A_NONCE, SP800_38A_COUNTER),
+                            plain_text, length, output),
                PAMBLE_OK);
 
   assert_bytes_equal_hex(output, SP800_38A_CIPHER_TEXT, length,
@@ -181,15 +181,14 @@ Test(pamble_aes_ctr, partial_final_block_is_a_prefix_of_the_keystream) {
 
 Test(pamble_aes_ctr, keystream_for_counter_zero) {
   uint8_t key[PAMBLE_AES256_KEY_SIZE];
+  uint8_t nonce[PAMBLE_AES_CTR_NONCE_BYTES];
   uint8_t zeros[PAMBLE_AES_BLOCK_SIZE] = {0};
   uint8_t output[PAMBLE_AES_BLOCK_SIZE];
-  pamble_aes_ctr_ctx ctx;
 
   hex_to_bytes(SEQ_KEY, key, sizeof(key));
+  hex_to_bytes(SEQ_NONCE, nonce, sizeof(nonce));
 
-  cr_assert_eq(pamble_aes_ctr_crypt(&ctx, key,
-                                    make_counter(SEQ_NONCE, "00000000"), zeros,
-                                    sizeof(zeros), output),
+  cr_assert_eq(pamble_aes_ctr_crypt(key, nonce, zeros, sizeof(zeros), output),
                PAMBLE_OK);
 
   assert_bytes_equal_hex(output, KEYSTREAM_COUNTER_ZERO, sizeof(output),
@@ -200,17 +199,56 @@ Test(pamble_aes_ctr, counter_carries_across_bytes) {
   uint8_t key[PAMBLE_AES256_KEY_SIZE];
   uint8_t zeros[2 * PAMBLE_AES_BLOCK_SIZE] = {0};
   uint8_t output[2 * PAMBLE_AES_BLOCK_SIZE];
-  pamble_aes_ctr_ctx ctx;
 
   hex_to_bytes(SEQ_KEY, key, sizeof(key));
 
-  cr_assert_eq(pamble_aes_ctr_crypt(&ctx, key,
-                                    make_counter(SEQ_NONCE, "000000ff"), zeros,
-                                    sizeof(zeros), output),
+  cr_assert_eq(stream_crypt(key, make_counter(SEQ_NONCE, "000000ff"), zeros,
+                            sizeof(zeros), output),
                PAMBLE_OK);
 
   assert_bytes_equal_hex(output, KEYSTREAM_ACROSS_BYTE_CARRY, sizeof(output),
                          "counter carry produced the wrong keystream");
+}
+
+Test(pamble_aes_ctr, one_shot_matches_streaming_from_counter_zero) {
+  uint8_t key[PAMBLE_AES256_KEY_SIZE];
+  uint8_t nonce[PAMBLE_AES_CTR_NONCE_BYTES];
+  uint8_t plain_text[SP800_38A_BYTES];
+  uint8_t one_shot_output[SP800_38A_BYTES];
+  uint8_t streaming_output[SP800_38A_BYTES];
+
+  hex_to_bytes(SP800_38A_KEY, key, sizeof(key));
+  hex_to_bytes(SP800_38A_NONCE, nonce, sizeof(nonce));
+  hex_to_bytes(SP800_38A_PLAIN_TEXT, plain_text, sizeof(plain_text));
+
+  cr_assert_eq(pamble_aes_ctr_crypt(key, nonce, plain_text, sizeof(plain_text),
+                                    one_shot_output),
+               PAMBLE_OK);
+  cr_assert_eq(stream_crypt(key, make_counter(SP800_38A_NONCE, "00000000"),
+                            plain_text, sizeof(plain_text), streaming_output),
+               PAMBLE_OK);
+
+  cr_assert_eq(
+      memcmp(one_shot_output, streaming_output, sizeof(one_shot_output)), 0,
+      "one-shot output differs from streaming output starting at counter 0");
+}
+
+Test(pamble_aes_ctr, one_shot_does_not_modify_the_nonce) {
+  uint8_t key[PAMBLE_AES256_KEY_SIZE];
+  uint8_t nonce[PAMBLE_AES_CTR_NONCE_BYTES];
+  uint8_t original_nonce[PAMBLE_AES_CTR_NONCE_BYTES];
+  uint8_t zeros[3 * PAMBLE_AES_BLOCK_SIZE] = {0};
+  uint8_t output[sizeof(zeros)];
+
+  hex_to_bytes(SEQ_KEY, key, sizeof(key));
+  hex_to_bytes(SEQ_NONCE, nonce, sizeof(nonce));
+  memcpy(original_nonce, nonce, sizeof(nonce));
+
+  cr_assert_eq(pamble_aes_ctr_crypt(key, nonce, zeros, sizeof(zeros), output),
+               PAMBLE_OK);
+
+  cr_assert_eq(memcmp(nonce, original_nonce, sizeof(nonce)), 0,
+               "one-shot encrypt modified the caller's nonce");
 }
 
 Test(pamble_aes_ctr, chunked_update_matches_one_shot_for_every_split) {
@@ -268,43 +306,62 @@ Test(pamble_aes_ctr, one_byte_at_a_time_matches_one_shot) {
 Test(pamble_aes_ctr, in_place_operation) {
   uint8_t key[PAMBLE_AES256_KEY_SIZE];
   uint8_t buffer[SP800_38A_BYTES];
-  pamble_aes_ctr_ctx ctx;
 
   hex_to_bytes(SP800_38A_KEY, key, sizeof(key));
   hex_to_bytes(SP800_38A_PLAIN_TEXT, buffer, sizeof(buffer));
 
-  cr_assert_eq(pamble_aes_ctr_crypt(
-                   &ctx, key, make_counter(SP800_38A_NONCE, SP800_38A_COUNTER),
-                   buffer, sizeof(buffer), buffer),
+  cr_assert_eq(stream_crypt(key,
+                            make_counter(SP800_38A_NONCE, SP800_38A_COUNTER),
+                            buffer, sizeof(buffer), buffer),
                PAMBLE_OK);
 
   assert_bytes_equal_hex(buffer, SP800_38A_CIPHER_TEXT, sizeof(buffer),
                          "in-place encryption does not match F.5.5");
 }
 
+Test(pamble_aes_ctr, one_shot_in_place_round_trip) {
+  uint8_t key[PAMBLE_AES256_KEY_SIZE];
+  uint8_t nonce[PAMBLE_AES_CTR_NONCE_BYTES];
+  uint8_t buffer[SP800_38A_BYTES];
+  uint8_t original[SP800_38A_BYTES];
+
+  hex_to_bytes(SEQ_KEY, key, sizeof(key));
+  hex_to_bytes(SEQ_NONCE, nonce, sizeof(nonce));
+  hex_to_bytes(SP800_38A_PLAIN_TEXT, buffer, sizeof(buffer));
+  memcpy(original, buffer, sizeof(buffer));
+
+  cr_assert_eq(pamble_aes_ctr_crypt(key, nonce, buffer, sizeof(buffer), buffer),
+               PAMBLE_OK);
+  cr_assert_neq(memcmp(buffer, original, sizeof(buffer)), 0,
+                "in-place one-shot did not change the buffer");
+  cr_assert_eq(pamble_aes_ctr_crypt(key, nonce, buffer, sizeof(buffer), buffer),
+               PAMBLE_OK);
+  cr_assert_eq(memcmp(buffer, original, sizeof(buffer)), 0,
+               "in-place one-shot round trip did not restore the message");
+}
+
 Test(pamble_aes_ctr, round_trip_restores_message) {
   uint8_t key[PAMBLE_AES256_KEY_SIZE];
+  uint8_t nonce[PAMBLE_AES_CTR_NONCE_BYTES];
   const size_t message_length = ROUND_TRIP_MESSAGE_LENGTH;
   uint8_t message[message_length];
   uint8_t encrypted[sizeof(message)];
   uint8_t decrypted[sizeof(message)];
-  pamble_aes_ctr_ctx ctx;
 
   hex_to_bytes(SEQ_KEY, key, sizeof(key));
+  hex_to_bytes(SEQ_NONCE, nonce, sizeof(nonce));
   for (size_t i = 0; i < sizeof(message); ++i) {
     message[i] = (uint8_t)((i * ROUND_TRIP_MULTIPLIER) + ROUND_TRIP_OFFSET);
   }
 
-  pamble_aes_ctr_counter_block counter = make_counter(SEQ_NONCE, "00000010");
-
-  cr_assert_eq(pamble_aes_ctr_crypt(&ctx, key, counter, message,
-                                    sizeof(message), encrypted),
-               PAMBLE_OK);
+  cr_assert_eq(
+      pamble_aes_ctr_crypt(key, nonce, message, sizeof(message), encrypted),
+      PAMBLE_OK);
   cr_assert_neq(memcmp(message, encrypted, sizeof(message)), 0,
                 "ciphertext equals plain text");
-  cr_assert_eq(pamble_aes_ctr_crypt(&ctx, key, counter, encrypted,
-                                    sizeof(encrypted), decrypted),
-               PAMBLE_OK);
+  cr_assert_eq(
+      pamble_aes_ctr_crypt(key, nonce, encrypted, sizeof(encrypted), decrypted),
+      PAMBLE_OK);
 
   cr_assert_eq(memcmp(message, decrypted, sizeof(message)), 0,
                "round trip did not restore the message");
@@ -312,21 +369,21 @@ Test(pamble_aes_ctr, round_trip_restores_message) {
 
 Test(pamble_aes_ctr, different_nonces_give_different_keystreams) {
   uint8_t key[PAMBLE_AES256_KEY_SIZE];
+  uint8_t first_nonce[PAMBLE_AES_CTR_NONCE_BYTES];
+  uint8_t second_nonce[PAMBLE_AES_CTR_NONCE_BYTES];
   uint8_t zeros[PAMBLE_AES_BLOCK_SIZE] = {0};
   uint8_t first[PAMBLE_AES_BLOCK_SIZE];
   uint8_t second[PAMBLE_AES_BLOCK_SIZE];
-  pamble_aes_ctr_ctx ctx;
 
   hex_to_bytes(SEQ_KEY, key, sizeof(key));
+  hex_to_bytes(SEQ_NONCE, first_nonce, sizeof(first_nonce));
+  hex_to_bytes("ffffffffffffffffffffffff", second_nonce, sizeof(second_nonce));
 
-  cr_assert_eq(pamble_aes_ctr_crypt(&ctx, key,
-                                    make_counter(SEQ_NONCE, "00000000"), zeros,
-                                    sizeof(zeros), first),
-               PAMBLE_OK);
   cr_assert_eq(
-      pamble_aes_ctr_crypt(&ctx, key,
-                           make_counter("ffffffffffffffffffffffff", "00000000"),
-                           zeros, sizeof(zeros), second),
+      pamble_aes_ctr_crypt(key, first_nonce, zeros, sizeof(zeros), first),
+      PAMBLE_OK);
+  cr_assert_eq(
+      pamble_aes_ctr_crypt(key, second_nonce, zeros, sizeof(zeros), second),
       PAMBLE_OK);
 
   cr_assert_neq(memcmp(first, second, sizeof(first)), 0,
@@ -411,24 +468,6 @@ Test(pamble_aes_ctr, cleanup_zeroes_the_whole_context) {
   cr_assert(is_all_zero(&ctx, sizeof(ctx)), "cleanup left data in the context");
 }
 
-Test(pamble_aes_ctr, one_shot_encrypt_wipes_the_context_on_success) {
-  uint8_t key[PAMBLE_AES256_KEY_SIZE];
-  uint8_t plain_text[SP800_38A_BYTES];
-  uint8_t output[SP800_38A_BYTES];
-  pamble_aes_ctr_ctx ctx;
-
-  hex_to_bytes(SP800_38A_KEY, key, sizeof(key));
-  hex_to_bytes(SP800_38A_PLAIN_TEXT, plain_text, sizeof(plain_text));
-
-  cr_assert_eq(pamble_aes_ctr_crypt(
-                   &ctx, key, make_counter(SP800_38A_NONCE, SP800_38A_COUNTER),
-                   plain_text, sizeof(plain_text), output),
-               PAMBLE_OK);
-
-  cr_assert(is_all_zero(&ctx, sizeof(ctx)),
-            "one-shot encrypt left key material in the context");
-}
-
 Test(pamble_aes_ctr, empty_message_succeeds_and_consumes_no_keystream) {
   uint8_t key[PAMBLE_AES256_KEY_SIZE];
   uint8_t output[SINGLE_BYTE_LENGTH] = {SENTINEL_BYTE};
@@ -444,6 +483,18 @@ Test(pamble_aes_ctr, empty_message_succeeds_and_consumes_no_keystream) {
   cr_assert_eq(memcmp(&ctx.counter, &counter, sizeof(counter)), 0,
                "empty update advanced the counter");
   cr_assert_eq(ctx.keystream_offset, PAMBLE_AES_BLOCK_SIZE);
+}
+
+Test(pamble_aes_ctr, one_shot_empty_message_succeeds_and_writes_nothing) {
+  uint8_t key[PAMBLE_AES256_KEY_SIZE];
+  uint8_t nonce[PAMBLE_AES_CTR_NONCE_BYTES];
+  uint8_t output[SINGLE_BYTE_LENGTH] = {SENTINEL_BYTE};
+
+  hex_to_bytes(SEQ_KEY, key, sizeof(key));
+  hex_to_bytes(SEQ_NONCE, nonce, sizeof(nonce));
+
+  cr_assert_eq(pamble_aes_ctr_crypt(key, nonce, NULL, 0, output), PAMBLE_OK);
+  cr_assert_eq(output[0], SENTINEL_BYTE, "empty one-shot wrote to the output");
 }
 
 Test(pamble_aes_ctr, last_counter_value_is_still_usable) {
@@ -537,23 +588,6 @@ Test(pamble_aes_ctr, exhaustion_is_sticky) {
                PAMBLE_COUNTER_EXHAUSTED);
 }
 
-Test(pamble_aes_ctr, one_shot_reports_counter_exhaustion) {
-  uint8_t key[PAMBLE_AES256_KEY_SIZE];
-  uint8_t zeros[PAMBLE_AES_BLOCK_SIZE + 1] = {0};
-  uint8_t output[sizeof(zeros)];
-  pamble_aes_ctr_ctx ctx;
-
-  hex_to_bytes(SEQ_KEY, key, sizeof(key));
-
-  cr_assert_eq(pamble_aes_ctr_crypt(&ctx, key,
-                                    make_counter(SEQ_NONCE, "ffffffff"), zeros,
-                                    sizeof(zeros), output),
-               PAMBLE_COUNTER_EXHAUSTED);
-
-  cr_assert(is_all_zero(&ctx, sizeof(ctx)),
-            "failed one-shot encrypt left key material in the context");
-}
-
 Test(pamble_aes_ctr, init_rejects_null_context) {
   uint8_t key[PAMBLE_AES256_KEY_SIZE] = {0};
 
@@ -587,24 +621,14 @@ Test(pamble_aes_ctr, cleanup_rejects_null_context) {
   cr_assert_eq(pamble_aes_ctr_cleanup(NULL), PAMBLE_INVALID_ARGUMENT);
 }
 
-Test(pamble_aes_ctr, encrypt_rejects_null_context) {
-  uint8_t key[PAMBLE_AES256_KEY_SIZE] = {0};
-  uint8_t input[SINGLE_BYTE_LENGTH] = {0};
-  uint8_t output[SINGLE_BYTE_LENGTH];
-
-  cr_assert_eq(pamble_aes_ctr_crypt(NULL, key,
-                                    make_counter(SEQ_NONCE, "00000000"), input,
-                                    sizeof(input), output),
-               PAMBLE_INVALID_ARGUMENT);
-}
-
 Test(pamble_aes_ctr, encrypt_rejects_null_input_with_nonzero_length) {
   uint8_t key[PAMBLE_AES256_KEY_SIZE] = {0};
+  uint8_t nonce[PAMBLE_AES_CTR_NONCE_BYTES];
   uint8_t output[SINGLE_BYTE_LENGTH];
-  pamble_aes_ctr_ctx ctx;
 
-  cr_assert_eq(pamble_aes_ctr_crypt(&ctx, key,
-                                    make_counter(SEQ_NONCE, "00000000"), NULL,
-                                    SINGLE_BYTE_LENGTH, output),
-               PAMBLE_INVALID_ARGUMENT);
+  hex_to_bytes(SEQ_NONCE, nonce, sizeof(nonce));
+
+  cr_assert_eq(
+      pamble_aes_ctr_crypt(key, nonce, NULL, SINGLE_BYTE_LENGTH, output),
+      PAMBLE_INVALID_ARGUMENT);
 }
