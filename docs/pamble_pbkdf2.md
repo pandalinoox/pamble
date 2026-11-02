@@ -54,6 +54,31 @@ The function:
 
 Because the interface is one-shot, the complete password and salt must be available at the time of the call, and the entire derived key is produced and written at once.
 
+### `pamble_pbkdf2_with_progress`
+
+Same derivation, with iteration progress reported through a [`pamble_progress`](pamble_progress.md) destination.
+
+```c
+pamble_status pamble_pbkdf2_with_progress(
+    size_t password_length,
+    const uint8_t password[static password_length],
+    size_t salt_length,
+    const uint8_t salt[static salt_length],
+    size_t dk_length,
+    uint8_t derived_key[static dk_length],
+    const pamble_progress progress[static 1],
+    const pamble_progress_event stage_event[static 1]
+);
+```
+
+The derived key is identical to `pamble_pbkdf2`'s for the same inputs. `stage_event` supplies the stage, step and step count to report under; the function fills in `done` and `total` itself:
+
+- `total` is `blocks * PAMBLE_PBKDF2_ITERATIONS`, the iterations needed for every output block. A 64-byte key is two blocks, so 1,200,000.
+- An event with `done = 0` is sent before the first block.
+- Another is sent every `PAMBLE_PBKDF2_ITERATIONS / 100` iterations (every 1% of a block), so the last event has `done == total`.
+
+A zero-initialized `pamble_progress` makes the reports no-ops. `pamble_pbkdf2` itself is unchanged and reports nothing; both functions share one internal implementation, `derive_key`, which takes an optional `iteration_reporter`.
+
 ## Internal Design
 
 ### Block Index Encoding

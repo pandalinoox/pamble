@@ -11,7 +11,7 @@ The status definition is provided by:
 
 ## `pamble_status`
 
-The current status enum contains six values:
+The current status enum contains seven values:
 
 ```c
 typedef enum {
@@ -21,6 +21,7 @@ typedef enum {
   PAMBLE_IO_ERROR,
   PAMBLE_INVALID_ARCHIVE,
   PAMBLE_COUNTER_EXHAUSTED,
+  PAMBLE_AUTHENTICATION_FAILED,
 } pamble_status;
 ```
 
@@ -77,6 +78,15 @@ allows.
 The AES-CTR API returns this when a message would use more than 2^32 counter
 blocks under one nonce. Continuing would wrap the counter and reuse keystream,
 so the operation stops instead.
+
+### `PAMBLE_AUTHENTICATION_FAILED`
+
+Indicates that data failed its integrity check.
+
+The crypto API returns this from `pamble_decrypt_archive` when the HMAC tag
+recomputed from the file does not match the stored tag. That happens with a
+wrong password or a file that was modified after encryption; the two cases are
+deliberately indistinguishable. Nothing is decrypted or extracted.
 
 ## Error Propagation
 

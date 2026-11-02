@@ -1,0 +1,74 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish
+    runs-on: ubuntu-latest
+    env:
+      ASSET: pamble-${{ github.ref_name }}-linux-x86_64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check tag matches project version
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          if ! grep -Eq "^[[:space:]]*VERSION ${version//./\\.}$" CMakeLists.txt; then
+            echo "Tag $GITHUB_REF_NAME does not match project(VERSION) in CMakeLists.txt" >&2
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake pkg-config libcriterion-dev
+
+      - name: Test
+        run: |
+          cmake -S . -B build-test -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          cmake --build build-test -- -j"$(nproc)"
+          ctest --test-dir build-test --output-on-failure
+
+      - name: Build static binary
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
+            -DPAMBLE_BUILD_TESTS=OFF -DPAMBLE_STATIC=ON
+          cmake --build build --target pamble -- -j"$(nproc)"
+          strip build/pamble
+
+      - name: Smoke test
+        run: |
+          ./build/pamble --version
+          mkdir -p smoke/data && echo "hello" > smoke/data/a.txt
+          printf 'smoke\n' | ./build/pamble encrypt smoke/data smoke/data.pamble
+          printf 'smoke\n' | ./build/pamble decrypt smoke/data.pamble smoke/out
+          diff -r smoke/data smoke/out/data
+
+      - name: Package
+        run: |
+          mkdir "$ASSET"
+          cp build/pamble README.md LICENSE.md "$ASSET"/
+          tar -czf "$ASSET.tar.gz" "$ASSET"
+          sha256sum "$ASSET.tar.gz" > "$ASSET.tar.gz.sha256"
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          notes=".github/release-notes/${GITHUB_REF_NAME}.md"
+          if [ -f "$notes" ]; then
+            set -- --notes-file "$notes"
+          else
+            set -- --generate-notes
+          fi
+          gh release create "$GITHUB_REF_NAME" \
+            "$ASSET.tar.gz" "$ASSET.tar.gz.sha256" \
+            --title "pamble $GITHUB_REF_NAME" "$@"
